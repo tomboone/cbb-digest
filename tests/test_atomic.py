@@ -37,3 +37,20 @@ def test_failed_write_keeps_the_old_file(tmp_path: Path, monkeypatch: pytest.Mon
 
     assert path.read_text() == "old"
     assert [p.name for p in tmp_path.iterdir()] == ["digest.txt"]
+
+
+def test_writes_bytes_unchanged(tmp_path: Path) -> None:
+    path = tmp_path / "cache" / "blob"
+    data = bytes(range(256))
+
+    write_atomic(path, data)
+
+    assert path.read_bytes() == data
+
+
+def test_text_is_written_as_utf8(tmp_path: Path) -> None:
+    path = tmp_path / "digest.txt"
+
+    write_atomic(path, "CBB digest — week of Nov 9")
+
+    assert path.read_bytes() == "CBB digest — week of Nov 9".encode()
