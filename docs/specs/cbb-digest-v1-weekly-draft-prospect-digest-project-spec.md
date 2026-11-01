@@ -28,8 +28,8 @@ Tom follows the NBA, not college basketball. cbb-digest emails him one Monday-mo
 | Scheduler | In-app: `cbb-digest serve` sleeps until Monday 07:00 `America/New_York`. Restart-safe through the `runs` table (ADR-0001). |
 | Storage | SQLite file `/data/cbb-digest.sqlite3`, SQLAlchemy core + Alembic in batch mode (ADR-0001). |
 | Backup | Host systemd timer, nightly: `sqlite3 .backup` → `PRAGMA integrity_check` → USB drive → `rclone sync` to B2 → Kuma push. Cloned from closinglineup's `deploy/backup/`. |
-| Team ratings | CBBD adjusted net rating. **Rank** = position by net rating (ADR-0002). |
-| Player stats | Torvik player season file and player game logs (plain GET, CSV). |
+| Team ratings | CBBD adjusted net rating. **Rank** = position by net rating, which CBBD supplies as `rankings.net` (ADR-0002). |
+| Player stats | Torvik player season file (plain GET, CSV) and player game logs (plain GET, gzipped JSON). |
 | Schedule and TV | ESPN unofficial scoreboard. |
 | Email | Jinja2 → MJML → `mjml-python`, plus a Jinja2 text part. Port nba-today's `render/`. |
 | Transport | Resend (primary) from `cbb@tomboone.com` on the domain already verified for mlb-today/nba-today, with an optional Fastmail SMTP fallback and a dry-run outbox. Port nba-today's `transport/`. To: `tom@tomboone.com`. |
@@ -64,26 +64,49 @@ Plain responsive HTML (MJML) with a text part. Readable on a phone in under five
 
 **TS%** = PTS / (2 × (FGA + 0.44 × FTA)) over the games in the window. It shows `—` when FGA + FTA = 0.
 
-**Formatting:** per-game stats to one decimal; percentages as whole numbers (`TS 58%`); times as `7:00 PM ET`; ranks as `#12`. Every team and player name links to its Torvik page. Players: `https://barttorvik.com/playerstat.php?link=y&p=<name>&t=<torvik team>`. Teams: `https://barttorvik.com/team.php?team=<torvik team>&year=<season>`. Confirm the exact URL forms in the fixture ticket.
+**Formatting:** per-game stats to one decimal; percentages as whole numbers (`TS 58%`); times as `7:00 PM ET`; ranks as `#12`. Every team and player name links to its Torvik page. Players: `https://barttorvik.com/playerstat.php?link=y&year=<season>&p=<name>&t=<torvik team>`. Teams: `https://barttorvik.com/team.php?team=<torvik team>&year=<season>`. Names are URL-encoded (`p=Bennett%20Stirtz`). These are links for the reader's browser only. The player page answers a non-browser client with Torvik's browser check (§6), and the pipeline never fetches either page, so the probe could not open them. Both forms come from a GitHub code search on 2026-11-01. The player form there carries `year=`, which the original form lacked. The team form matched the original. Clicking one of each in the first dry-run digest is the check.
 
 ## 6. Data sources
 
-**Probe of 2026-10-31** (all requests used a browser User-Agent):
+Probed on 2026-10-31 and again on 2026-11-01 (NEU-2093; 15 requests). All requests used a browser User-Agent. The fixtures, request log and full positional column maps are in `tests/fixtures/` and its `README.md`.
 
-| Source / endpoint | Result |
+**Torvik** (`https://barttorvik.com`, no key):
+
+| Endpoint | Finding |
 |---|---|
-| Torvik `trank.php?year=2027&json=1` | **Blocked**: HTML "Verifying Browser…" JavaScript challenge. Not used (ADR-0002). |
-| Torvik `getadvstats.php?year=2027&csv=1` (player season) | 200 `text/csv`, about 1 MB, headerless CSV. It already held rows (e.g. 22 games) before the season tipped off. **Verify whether preseason rows are last season's**, and confirm the column map against hoopR's `R/torvik_*.R`. |
-| Torvik `getgamestats.php?year=2027&csv=1` (player game logs) | 200 `text/csv`, empty (no games yet). Confirm the column map once games exist. |
-| ESPN `…/mens-college-basketball/scoreboard?dates=20261103&groups=50&limit=400` | 200 JSON. `season.year = 2027`. Broadcasts are at `competitions[].broadcasts[].names`, e.g. `['SEC Network']`. Only **29** events for 2026-11-03: **verify completeness** against the CBBD games count for the same date, and test whether a `dates=YYYYMMDD-YYYYMMDD` range is accepted. |
-| CBBD | Not probed (needs a key). Its site shows adjusted ratings (AdjO, AdjD, Net). The free key shares its quota with CollegeFootballData. Confirm the endpoints for teams, adjusted ratings, rosters and games, and the quota. |
+| `trank.php?year=2027&json=1` | **Blocked**: HTML "Verifying Browser…" JavaScript challenge. Not used (ADR-0002). |
+| `getadvstats.php?year=<season>&csv=1`: **player season file** | 200 `text/csv`, headerless, 67 fields per row, in hoopR's `R/torvik_player_stats.R` order. Shooting makes and attempts (`ftm`, `fta`, `two_pm`, `two_pa`, `three_pm`, `three_pa`) are **season totals**. `minutes`, `oreb`, `dreb`, `treb`, `ast`, `stl`, `blk` and `pts` are **per-game averages**. Field 31 is the season, 32 the player id, and 25 the class (`Fr`/`So`/`Jr`/`Sr`). Season-to-date total minutes = `minutes × games`. 2026: 4,978 rows, 365 teams. |
+| ↳ preseason rows | **Last season's, by inference.** On 2026-10-31 the 2027 file held about 1 MB of rows with up to 22 games, which no 2027 game could produce. By 2026-11-01 Torvik had replaced it with the first 2027 data: 19 rows from one Notre Dame–Villanova game, each with `year=2027` and `games=1`. The 10-31 body was not kept, so whether those stale rows carried `year=2026` in field 31 is unknown. The loader keeps only rows whose field 31 equals `season`. Stale rows never make a Monday in season, because §8.2 reads the game logs. |
+| `{season}_all_advgames.json.gz`: **player game logs** | 200 `application/json` with `Content-Encoding: gzip`: a JSON list of 53-element lists, one per player per game played. It holds the date (`YYYYMMDD`), the opponent's Torvik name, minutes (index 8), 2PM/2PA/3PM/3PA/FTM/FTA, PTS, ORB/DRB, AST, team, player name and player id. FGM = 2PM + 3PM, FGA = 2PA + 3PA. Only D-I vs D-I games appear. **A player who did not play has no row** (2026: zero 0-minute rows), so DNP (§8.4) means no row for the player on a date when another player on his team has one. Size: 11 MB on the wire and 44 MB decoded at season end, fetched once per run. Before the season's file is published (2027 on 2026-11-01), the URL **302-redirects to `/`**. The client does not follow redirects, and treats that redirect as an empty game log, never as data. |
+| `getgamestats.php?year=<season>&csv=1` | **Not player game logs**, as the 10-31 probe assumed. It is one row per **team**-game (31 fields, hoopR's `R/torvik_game_stats.R`). Not used. |
+| `playerstat.php?…` (player page) | **Blocked**: 200 `text/html`, `<title>Verifying Browser...</title>`. Used only as a link for the reader (§5). |
+
+**The challenge page returns HTTP 200.** A Torvik response is a source failure (§9.3) when its content type is `text/html` or its body contains `Verifying Browser`, whatever the status. The fixture `tests/fixtures/torvik/playerstat-challenge-*.html` is the page to test against.
+
+**ESPN** (`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard`, no key):
+
+| Query | Finding |
+|---|---|
+| `?dates=YYYYMMDD&groups=50&limit=1000` | 200 JSON. `leagues[0].season.year = 2027`. `dates` selects the US-local day, and `events[].date` is UTC, so most evening games carry the next day's UTC date. **Complete**: 29 events for 2026-11-03 (Election Day; opening night is Monday 2026-11-02), the same 29 CBBD lists for that ET day. Broadcasts are at `competitions[].broadcasts[].names`. Teams are at `competitions[].competitors[].team`, with `id`, `location`, and `conferenceId`. **Non-D-I opponents appear, with no `conferenceId`**. |
+| `?dates=YYYYMMDD-YYYYMMDD…` | **400** `{"code":400,"message":"Failed to get events endpoint."}`. Ranges are not accepted. |
+| `?dates=YYYYMM…` | 200, the whole month, but cut off at `limit` (1,000 events, 6.5 MB, ending 2026-11-19). Not used: a month holds more games than any safe limit, and a week can span two months. |
+
+**CBBD** (`https://api.collegebasketballdata.com`, `Authorization: Bearer <CBBD_API_KEY>`; seasons are end years, so 2027 = 2026-27):
+
+| Endpoint | Finding |
+|---|---|
+| `GET /teams?season=<season>` | List of 365 D-I teams: `id`, `school`, `displayName`, `conference`, and `sourceId`. **`sourceId` is the ESPN team id**: every D-I team in the ESPN fixture matches one, and no non-D-I team does. |
+| `GET /ratings/adjusted?season=<season>` | List of `{season, teamId, team, conference, offensiveRating, defensiveRating, netRating, rankings: {offense, defense, net}}`, one per D-I team. **`[]` for 2027 on 2026-11-01**: ratings exist only once games are played. An empty list is a valid response, and every team is then unranked. |
+| `GET /teams/roster?season=<season>` | One request returns every team: 1,544 entries, of which only the 365 D-I teams carry `players` (12 to 20 each). A player has `id`, `sourceId`, `name`, `firstName`, `lastName`, `position`, `height`, `startSeason` and `endSeason`. Filter `team=` exists but is not needed. |
+| `GET /games?startDateRange=<ISO>&endDateRange=<ISO>` | Games in a UTC window. `sourceId` is the ESPN event id. Used only for this probe's completeness check. |
+| Quota | **1,000 calls** on the free key, shared with CollegeFootballData. The `x-calllimit-remaining` response header read 999 after the first call and 995 after the fifth. The probe did not establish the reset period. It is assumed monthly, as on CollegeFootballData. A season of weekly runs uses about 30 calls. |
 
 **Use per run:**
 - **Torvik:** the player season file and the player game logs for `season`. That is 2 requests.
-- **CBBD:** adjusted ratings for `season`, which is 1 request. Teams, only when the crosswalk is refreshed. Rosters, in reset mode only.
-- **ESPN:** the scoreboard for this week. One range request if ranges are accepted, else 7 daily requests.
+- **CBBD:** adjusted ratings for `season`, which is 1 request. Teams, only when the crosswalk is refreshed. Rosters, in reset mode only (1 request).
+- **ESPN:** the scoreboard for this week, as 7 daily requests (ranges are rejected).
 
-A typical run makes 4 to 10 requests, under the 20-request budget.
+A typical run makes 10 requests, under the 20-request budget.
 
 **Politeness and robustness:** one fetch per endpoint per run. Every raw response is cached under `/data/cache/<source>/<key>` for 24 h, so re-running a step inside the window does not refetch. Requests use a shared httpx client (port nba-today `sources/http.py`) with a browser User-Agent and bounded retries. **Never poll.** Each endpoint has a pydantic model, and a shape change fails loudly as a source failure (§9.3), never as a silent partial parse. Fixtures live in `tests/fixtures/<source>/` with the fetch date in the filename.
 
@@ -161,10 +184,14 @@ An alert appears in section 5 **only on the run where its outcome or details fir
 - `torvik_name`;
 - `espn_id`, `espn_name`.
 
-Hand-mapped overrides live in the committed `teams_crosswalk.yaml`, keyed by slug, with fields `torvik_name` and `espn_id`; expect about 30. A crosswalk test asserts the mapping against the saved fixtures:
+`espn_id` comes from CBBD's `sourceId`, which is the ESPN team id (§6), so ESPN needs no hand mapping. `torvik_name` defaults to CBBD's `school`. Hand-mapped overrides live in the committed `teams_crosswalk.yaml`, keyed by slug, with the field `torvik_name`. Expect about **93** `torvik_name` overrides: that many of the D-I teams common to Torvik 2026 and CBBD 2027 have a Torvik name that differs from CBBD's `school`, mostly `St.` against `State` (`Iowa St.`/`Iowa State`), plus forms like `Connecticut`/`UConn` and `Mississippi`/`Ole Miss`. The overrides are listed explicitly, never derived by a rewrite rule.
+
+An ESPN competitor with no `conferenceId` is a non-D-I team (§6). It is not in the crosswalk and raises no `unmapped_team`. Its game stays a featured-game candidate, with the team shown under its ESPN name, without a link, and counted as unranked. A crosswalk test asserts the mapping against the saved fixtures:
 - every ESPN D-I team in the scoreboard fixture maps to exactly one slug;
 - every distinct team in the Torvik season-file fixture maps to exactly one slug;
 - no two slugs share a source name.
+
+The Torvik season-file fixture is season 2026 and the CBBD teams fixture is season 2027. They differ by one team each way: `Saint Francis` is only in Torvik 2026 and `West Florida` only in CBBD 2027. The test allows exactly those two.
 
 At run time an unmapped name raises `unmapped_team` and is never fuzzily guessed.
 
@@ -198,7 +225,7 @@ Show the top 5, then `+N more`. Networks come from `broadcasts[].names`, joined 
 ### 8.4 Notable
 
 Evaluated per player over last week's games. The first rule that matches, in this order, is the only flag shown:
-1. `DNP` / `DNP — 2nd straight week`: the team played at least one game last week and the player logged 0 minutes in all of them. Such a player *does* get a row; it is the one exception to "played". From the second straight week the player also raises `inactive` (§7.4).
+1. `DNP` / `DNP — 2nd straight week`: the team played at least one game last week and the player logged 0 minutes in all of them. Torvik writes no game-log row for a player who did not play (§6), so 0 minutes means no row for him on a date with rows for his team. Such a player *does* get a row; it is the one exception to "played". From the second straight week the player also raises `inactive` (§7.4).
 2. `Season high: N pts`: a game last week set the player's season high in points, with at least 3 season games played before it.
 3. `0-for-N`: a game with 0 FGM on ≥ 5 FGA, or 0 3PM on ≥ 5 3PA. Show the larger N, labelled `FG` or `3P`.
 
@@ -341,10 +368,6 @@ Linear: project P-NEU-106, stories NEU-2081..2087, tickets NEU-2088..2120. NEU-2
 ## 13. Deferred and open
 
 - **Deferred:** career highs (needs backfill), injury flags, a stale-snapshot fallback, shared code with the NBA apps, a web view, and multi-recipient sending.
-- **To verify in milestone 2:**
-  - Torvik preseason rows and column maps;
-  - Torvik player and team URL forms;
-  - ESPN completeness and range support;
-  - the CBBD endpoints and quota.
-
-  Each check either confirms this spec or records the correction in the fixture ticket's PR, and amends this spec.
+- **Probed in milestone 2** (NEU-2093, 2026-11-01): Torvik preseason rows and column maps, ESPN completeness and range support, and the CBBD endpoints and quota. The results are in §6 and §7.5. Still open, because the probe cannot reach them:
+  - the Torvik link forms (§5), which sit behind the browser check: click one of each in the first dry-run digest;
+  - the CBBD quota reset period.
