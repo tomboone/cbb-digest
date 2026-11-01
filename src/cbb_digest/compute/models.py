@@ -4,15 +4,61 @@ Each section is its own model, so each builder can be tested on its own; the `Di
 them is assembled by the `compute` command.
 """
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 type MoverKind = Literal["moved", "entered", "left"]
+type Tier = Literal[1, 2, 3]
 
 
 class _Model(BaseModel):
     model_config = ConfigDict(frozen=True)
+
+
+class FeaturedTeam(_Model):
+    """One side of a featured game.
+
+    `display_name` is CBBD's name for the team. A team the crosswalk does not know, such as a
+    non-D-I opponent, has no `slug`, is shown under ESPN's name and gets no link (spec §7.5);
+    `display_name` is `None` only if ESPN gave no name either. `rank` is this run's ratings
+    rank, and `None` for a team missing from the snapshot or with no slug.
+    """
+
+    slug: str | None
+    display_name: str | None
+    rank: int | None
+
+
+class FeaturedPlayer(_Model):
+    """A resolved watchlist player on one of the two teams. `name` is Torvik's spelling."""
+
+    name: str
+    torvik_pid: int
+    tier: Tier
+    team_slug: str
+
+
+class FeaturedGame(_Model):
+    """One featured game (spec §8.3): `start` is aware Eastern, and `networks` is ESPN's
+    broadcast names joined with `/`, or `—` when the game has none. `players` are sorted by tier,
+    then name."""
+
+    espn_id: str
+    start: datetime
+    networks: str
+    venue: str | None
+    home: FeaturedTeam
+    away: FeaturedTeam
+    players: list[FeaturedPlayer]
+
+
+class FeaturedGamesSection(_Model):
+    """Section 1: at most 5 featured games, and how many more qualified."""
+
+    rows: list[FeaturedGame] = []
+    more_count: int = 0
 
 
 class Mover(_Model):

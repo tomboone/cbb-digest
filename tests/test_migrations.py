@@ -95,7 +95,7 @@ def test_upgrade_twice_is_a_no_op(url: str) -> None:
     db.upgrade(url)
 
     assert _schema_sql(url) == schema
-    assert _version(url) == version == ["0002"]
+    assert _version(url) == version == ["0003"]
 
 
 def test_baseline_reruns_over_existing_tables(url: str) -> None:
@@ -112,7 +112,7 @@ def test_baseline_reruns_over_existing_tables(url: str) -> None:
 
     # A batch rebuild (0002) may reorder a table's constraints, but not change them.
     assert _unordered(_schema_sql(url)) == schema
-    assert _version(url) == ["0002"]
+    assert _version(url) == ["0003"]
 
 
 def test_migrations_contain_no_alembic_tmp_statements() -> None:
@@ -203,4 +203,32 @@ def test_0002_reruns_to_the_same_table(url: str) -> None:
     db.upgrade(url)
 
     assert _unordered(_schema_sql(url)) == before
+    assert _version(url) == ["0003"]
+
+
+def _game_columns(url: str) -> list[str]:
+    engine = db.create_engine(url)
+    columns = [column["name"] for column in inspect(engine).get_columns("games")]
+    engine.dispose()
+    return columns
+
+
+def test_0003_adds_the_side_names_reruns_and_downgrades(url: str) -> None:
+    db.upgrade(url, "0002")
+    assert "home_name" not in _game_columns(url)
+
+    db.upgrade(url)
+    after = _schema_sql(url)
+    assert {"home_name", "away_name"} <= set(_game_columns(url))
+
+    engine = db.create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE alembic_version SET version_num = '0002'"))
+    engine.dispose()
+    db.upgrade(url)
+    assert _schema_sql(url) == after
+    assert _version(url) == ["0003"]
+
+    db.downgrade(url, "0002")
+    assert not {"home_name", "away_name"} & set(_game_columns(url))
     assert _version(url) == ["0002"]

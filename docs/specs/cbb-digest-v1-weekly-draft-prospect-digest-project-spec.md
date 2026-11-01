@@ -288,7 +288,7 @@ If the email cannot be sent through any transport, or an unexpected exception oc
 | `team_ratings_snapshot` | (`run_id`, `slug`) | rank, net, adj_o, adj_d, fetched_at. |
 | `players` | (`season`, `torvik_pid`) | name, normalised name, team slug, class year, season totals used by §8.4–8.5. |
 | `player_games` | (`season`, `torvik_pid`, `game_date`, `opponent_slug`) | min, pts, reb, ast, fgm, fga, 3pm, 3pa, fta, and what TS% needs. |
-| `games` | `espn_id` | start_utc, home_slug, away_slug, networks, venue, season. |
+| `games` | `espn_id` | start_utc, home_slug, away_slug, ESPN's home_name and away_name (§7.5), networks, venue, season. |
 | `watchlist_resolution` | (`season`, `watchlist_key`) | §7.3 fields. |
 | `runs` | `run_id` | kind (`digest`/`reset`), season, both windows, status (`running`/`sent`/`sent_degraded`/`skipped_offseason`/`skipped_missed`/`failed`), started_at, finished_at, duration, per-source row counts, failed sources, alerts raised (JSON), image SHA, sent_at, transport used. |
 | `heartbeat` | singleton | last `serve` loop tick (for `health`). |
