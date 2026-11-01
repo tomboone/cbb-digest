@@ -187,6 +187,9 @@ games = Table(
     # NULL when that side is not a canonical team (spec §8.3 ranks it 999).
     _team_slug("home_slug", nullable=True),
     _team_slug("away_slug", nullable=True),
+    # ESPN's name for each side, which a side with a NULL slug is shown under (§7.5).
+    Column("home_name", String),
+    Column("away_name", String),
     # ESPN `broadcasts[].names`, in order; [] when the game has no broadcast.
     Column("networks", JSON, nullable=False),
     Column("venue", String),

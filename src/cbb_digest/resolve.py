@@ -104,6 +104,18 @@ class ResolveReport:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedPlayer:
+    """A watchlist player whose stored resolution is `resolved`, as the compute step reads it."""
+
+    player: WatchlistPlayer
+    torvik_pid: int
+    # The player's current team, which may differ from the one the entry states.
+    team_slug: str
+    # Torvik's spelling of the name, which the player's Torvik link needs (§5).
+    torvik_name: str
+
+
+@dataclass(frozen=True, slots=True)
 class _Player:
     pid: int
     name: str
@@ -147,8 +159,9 @@ def resolve(
 
     entries: list[Entry] = []
     for player in watchlist.players:
-        slugs = team_index.slugs_for(player.team) if player.team is not None else frozenset[str]()
-        if player.team is not None and len(slugs) != 1:
+        mapped, slugs = _stated_team(player, team_index)
+        if not mapped:
+            assert player.team is not None
             key = unmapped_watchlist_key(player)
             resolution = _unmapped(player.team, slugs, team_index)
         else:
@@ -166,6 +179,48 @@ def resolve(
         entries=entries,
         alerts=[entry.alert for entry in entries if entry.new and entry.alert is not None],
     )
+
+
+def resolved_players(connection: Connection, watchlist: Watchlist) -> list[ResolvedPlayer]:
+    """The watchlist players whose stored resolution is `resolved`, in watchlist order.
+
+    Reads what the last `resolve` stored and resolves nothing itself. Each entry is keyed the way
+    `resolve` keys it, through the same crosswalk, so an entry whose stated team does not map is
+    never among them: it is stored as `unresolved` under its `unmapped_watchlist_key`. Raises
+    `ResolveError` when `teams` is empty.
+    """
+    team_index = _team_index(connection)
+    query = select(
+        watchlist_resolution.c.watchlist_key,
+        watchlist_resolution.c.torvik_pid,
+        watchlist_resolution.c.team_slug,
+        watchlist_resolution.c.matched_name,
+    ).where(
+        watchlist_resolution.c.season == watchlist.season,
+        watchlist_resolution.c.outcome == "resolved",
+    )
+    stored = {row.watchlist_key: row for row in connection.execute(query)}
+
+    found: list[ResolvedPlayer] = []
+    for player in watchlist.players:
+        mapped, slugs = _stated_team(player, team_index)
+        if not mapped:
+            continue
+        row = stored.get(watchlist_key(player, next(iter(slugs), None)))
+        if row is None:
+            continue
+        found.append(ResolvedPlayer(player, row.torvik_pid, row.team_slug, row.matched_name))
+    return found
+
+
+def _stated_team(player: WatchlistPlayer, team_index: _Teams) -> tuple[bool, frozenset[str]]:
+    """Whether the entry's stated team maps, and the slugs it names: none when the entry states
+    no team (which counts as mapped), exactly one when it maps. `resolve` and
+    `resolved_players` must key an entry alike, so both decide it here."""
+    if player.team is None:
+        return True, frozenset()
+    slugs = team_index.slugs_for(player.team)
+    return len(slugs) == 1, slugs
 
 
 def _resolve_one(

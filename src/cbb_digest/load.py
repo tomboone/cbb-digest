@@ -7,7 +7,8 @@ rows are exactly the ratings it last loaded (spec §9.2).
 
 Team names map through the crosswalk in `teams` (§7.5). A source row whose team the crosswalk
 does not know is dropped and counted, never guessed. The one exception is `games`: a game keeps
-its row with NULL for that side, since a non-D-I opponent is never in the crosswalk (§8.3).
+its row with NULL for that side, since a non-D-I opponent is never in the crosswalk (§8.3), and
+ESPN's name for each side, which the digest shows such a team under (§7.5).
 
 **Renames.** CBBD's id is a team's identity, not its slug. When CBBD renames a school (IUPUI →
 IU Indianapolis), the row keeps the slug it was first stored under, because `players`, `games`
@@ -355,6 +356,8 @@ def _load_games(
             "start_utc": game.start,
             "home_slug": slug(game.home),
             "away_slug": slug(game.away),
+            "home_name": game.home.name,
+            "away_name": game.away.name,
             "networks": game.networks,
             "venue": game.venue,
         }

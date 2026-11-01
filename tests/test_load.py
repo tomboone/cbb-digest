@@ -417,6 +417,7 @@ def test_espn_name_is_filled_from_the_week_and_a_non_d1_side_is_ignored(engine: 
     with engine.connect() as connection:
         rows = {row.espn_id: row for row in connection.execute(select(games))}
     assert (rows["1"].home_slug, rows["1"].away_slug) == ("duke", None)
+    assert (rows["1"].home_name, rows["1"].away_name) == ("Duke", "Small College")
     assert rows["1"].networks == ["ESPN", "ESPN+"]
 
     again = _load(engine, _input(espn_week=week))

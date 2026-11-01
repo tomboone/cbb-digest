@@ -11,7 +11,13 @@ from typer.testing import CliRunner
 
 from cbb_digest import db, watchlist
 from cbb_digest.cli import app
-from cbb_digest.resolve import ResolveError, ResolveReport, resolve
+from cbb_digest.resolve import (
+    ResolvedPlayer,
+    ResolveError,
+    ResolveReport,
+    resolve,
+    resolved_players,
+)
 from cbb_digest.schema import player_games, players, runs, teams, watchlist_resolution
 from cbb_digest.watchlist import Watchlist, WatchlistPlayer, normalise_name
 from cbb_digest.weeks import windows_for
@@ -387,6 +393,32 @@ def test_resolve_inserts_a_placeholder_run_and_leaves_an_existing_one(engine: En
 
 
 # --- `cbb-digest resolve` ---
+
+
+def test_resolved_players_reads_back_only_the_resolved_entries_in_watchlist_order(
+    engine: Engine,
+) -> None:
+    _add_player(engine, 11, "Tyran Stokes", "kansas")
+    _add_player(engine, 21, "Darryn Peterson", "duke")
+    _add_player(engine, 31, "AJ Dybantsa", "iowa-state")
+    wl = _watchlist(
+        ("Darryn Peterson", "Kansas"),
+        ("Nobody Here", "Duke"),
+        ("Someone", "Kanzas"),
+        ("A.J. Dybantsa", None),
+        ("Tyran Stokes", "Kansas"),
+    )
+    _resolve(engine, wl)
+
+    with engine.connect() as connection:
+        found = resolved_players(connection, wl)
+
+    by_name = {player.name: player for player in wl.players}
+    assert found == [
+        ResolvedPlayer(by_name["Darryn Peterson"], 21, "duke", "Darryn Peterson"),
+        ResolvedPlayer(by_name["A.J. Dybantsa"], 31, "iowa-state", "AJ Dybantsa"),
+        ResolvedPlayer(by_name["Tyran Stokes"], 11, "kansas", "Tyran Stokes"),
+    ]
 
 
 def test_the_resolve_command_prints_every_entry_and_its_alerts(
