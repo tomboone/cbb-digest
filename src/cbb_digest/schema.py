@@ -211,6 +211,10 @@ watchlist_resolution = Table(
     Column("alert_detail", Text),
     Column("first_run_id", String, ForeignKey("runs.run_id"), nullable=False),
     Column("changed_run_id", String, ForeignKey("runs.run_id"), nullable=False),
+    # The run that raised the player's standing `inactive` alert (§7.4), and NULL while they are
+    # not inactive. It is kept apart from `alert_kind`, which `resolve` rewrites on every run, so
+    # an inactive player is reported once, not weekly. Only the compute step writes it.
+    Column("inactive_run_id", String, ForeignKey("runs.run_id")),
     PrimaryKeyConstraint("season", "watchlist_key"),
     ForeignKeyConstraint(
         ["season", "torvik_pid"],
