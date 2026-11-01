@@ -1,0 +1,10 @@
+# The watchlist (spec §7.1). Edited by hand, by PR; the pipeline never writes this file.
+#
+# players:
+#   - name: Tyran Stokes
+#     team: Kansas      # team as of when the line was added; may be blank
+#     tier: 1           # 1 must-watch, 2 tracking, 3 fringe
+#     class: 2027       # expected draft year; must be >= season
+#     note: "optional free text"
+season: 2027          # season end year
+players: []
