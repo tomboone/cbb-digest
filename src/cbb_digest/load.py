@@ -112,7 +112,9 @@ def load(connection: Connection, data: LoadInput, *, now: datetime) -> LoadRepor
     if not isinstance(data.ratings, SourceFailure):
         if data.ratings_fetched_at is None:
             raise ValueError("ratings_fetched_at is required with ratings")
-        _ensure_run(connection, data, now)
+        ensure_run(
+            connection, run_id=data.run_id, season=data.season, windows=data.windows, now=now
+        )
         report.tables["team_ratings_snapshot"] = _load_snapshot(
             connection, crosswalk, data.run_id, data.ratings, data.ratings_fetched_at
         )
@@ -363,17 +365,21 @@ def _load_games(
 # --- CBBD ratings ---
 
 
-def _ensure_run(connection: Connection, data: LoadInput, now: datetime) -> None:
+def ensure_run(
+    connection: Connection, *, run_id: str, season: int, windows: Windows, now: datetime
+) -> None:
+    """Insert a placeholder `runs` row (`status=running`) for `run_id` if it has none, so rows
+    that reference the run can be written. An existing row is never changed."""
     connection.execute(
         sqlite_insert(runs)
         .values(
-            run_id=data.run_id,
+            run_id=run_id,
             kind="digest",
-            season=data.season,
-            last_week_start=data.windows.last_week.start,
-            last_week_end=data.windows.last_week.end,
-            this_week_start=data.windows.this_week.start,
-            this_week_end=data.windows.this_week.end,
+            season=season,
+            last_week_start=windows.last_week.start,
+            last_week_end=windows.last_week.end,
+            this_week_start=windows.this_week.start,
+            this_week_end=windows.this_week.end,
             status="running",
             started_at=now,
         )

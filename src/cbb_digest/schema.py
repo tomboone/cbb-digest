@@ -73,7 +73,7 @@ class UTCDateTime(TypeDecorator[datetime]):
 RUN_KINDS = ("digest", "reset")
 RUN_STATUSES = ("running", "sent", "sent_degraded", "skipped_offseason", "skipped_missed", "failed")
 RESOLUTION_OUTCOMES = ("resolved", "unresolved", "ambiguous")
-RESOLUTION_ALERT_KINDS = ("unresolved", "ambiguous", "team_changed", "fuzzy_match")
+RESOLUTION_ALERT_KINDS = ("unresolved", "ambiguous", "team_changed", "fuzzy_match", "unmapped_team")
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> str:
