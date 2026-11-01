@@ -1,0 +1,25 @@
+name: cbb-digest
+
+services:
+  cbb-digest:
+    # `latest` tracks main; pin `sha-<7>` to roll back (README).
+    image: ghcr.io/tomboone/cbb-digest:latest
+    env_file: .env
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+      - com.centurylinklabs.watchtower.scope=cbb-digest
+
+  # Polls GHCR every 5 minutes and restarts only enabled containers in the `cbb-digest` scope, so it
+  # leaves the other stacks on kumadrome alone. The instance carries its own scope label, as
+  # Watchtower's multiple-instance docs require.
+  watchtower:
+    image: nickfedor/watchtower:1.23.2
+    command: ["--label-enable", "--scope", "cbb-digest", "--interval", "300", "--cleanup"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.scope=cbb-digest
