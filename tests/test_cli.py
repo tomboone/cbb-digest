@@ -46,9 +46,7 @@ def test_help_lists_commands() -> None:
         ["render", "--dry-run"],
         ["send", "--force"],
         ["run", "--week", "2026-11-09", "--force", "--dry-run"],
-        ["serve"],
         ["reset", "--season", "2028", "--send"],
-        ["health"],
     ],
 )
 def test_stub_exits_1_not_implemented(args: list[str]) -> None:
