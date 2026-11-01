@@ -23,8 +23,8 @@ stored rows (`stored_cbbd_teams`), so a merged override fixes an `unmapped_team`
 source that carries it, and the crosswalk never sets it. A team that has not played on ESPN's
 scoreboard yet keeps NULL.
 
-The `runs` row is not this module's: it inserts a placeholder (`status=running`) only so the
-snapshot's foreign key holds, and never changes an existing row.
+The `runs` row is not this module's: `runs.ensure_run` inserts a placeholder (`status=running`)
+only so the snapshot's foreign key holds, and never changes an existing row.
 """
 
 import logging
@@ -37,7 +37,8 @@ from typing import Any
 from sqlalchemy import Connection, Table, delete, insert, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from cbb_digest.schema import games, player_games, players, runs, team_ratings_snapshot, teams
+from cbb_digest.runs import ensure_run
+from cbb_digest.schema import games, player_games, players, team_ratings_snapshot, teams
 from cbb_digest.sources.fetched import Fetched, SourceFailure
 from cbb_digest.sources.models.cbbd_rating import CbbdRating, rank_ratings
 from cbb_digest.sources.models.cbbd_team import CbbdTeam
@@ -363,28 +364,6 @@ def _load_games(
 
 
 # --- CBBD ratings ---
-
-
-def ensure_run(
-    connection: Connection, *, run_id: str, season: int, windows: Windows, now: datetime
-) -> None:
-    """Insert a placeholder `runs` row (`status=running`) for `run_id` if it has none, so rows
-    that reference the run can be written. An existing row is never changed."""
-    connection.execute(
-        sqlite_insert(runs)
-        .values(
-            run_id=run_id,
-            kind="digest",
-            season=season,
-            last_week_start=windows.last_week.start,
-            last_week_end=windows.last_week.end,
-            this_week_start=windows.this_week.start,
-            this_week_end=windows.this_week.end,
-            status="running",
-            started_at=now,
-        )
-        .on_conflict_do_nothing(index_elements=[runs.c.run_id])
-    )
 
 
 def _load_snapshot(

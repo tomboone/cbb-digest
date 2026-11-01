@@ -36,7 +36,7 @@ from typing import Any, Literal
 from rapidfuzz import fuzz
 from sqlalchemy import Connection, exists, insert, select, update
 
-from cbb_digest.load import ensure_run
+from cbb_digest.runs import ensure_run
 from cbb_digest.schema import player_games, players, teams, watchlist_resolution
 from cbb_digest.watchlist import (
     Watchlist,
