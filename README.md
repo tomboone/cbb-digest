@@ -39,6 +39,17 @@ uv run cbb-digest --help
 uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
 ```
 
+## Container image
+
+Every push to `main` publishes `ghcr.io/tomboone/cbb-digest:latest` and `:sha-<7>`. The image runs
+`cbb-digest serve` as UID/GID 999 with `TZ=America/New_York`, keeps its state in `/data`, and has
+`watchlist.yaml` baked in.
+
+```sh
+docker build -t cbb-digest .
+docker run --rm cbb-digest --help
+```
+
 ## License
 
 MIT; see [`LICENSE`](LICENSE).
