@@ -16,6 +16,7 @@ from cbb_digest.clock import SystemClock
 from cbb_digest.logging import configure_logging
 from cbb_digest.scheduler import Scheduler
 from cbb_digest.settings import Settings
+from cbb_digest.watchlist import Watchlist, WatchlistError, load_watchlist
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 log = logging.getLogger(__name__)
@@ -41,6 +42,18 @@ def _bootstrap() -> Settings:
     return settings
 
 
+def _load_watchlist() -> Watchlist:
+    """The validated watchlist; exit 2 listing every error if it is invalid (spec §7.1).
+
+    Called first, so a bad watchlist stops a run before anything is fetched.
+    """
+    try:
+        return load_watchlist()
+    except WatchlistError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
+
+
 def _not_implemented(command: str) -> NoReturn:
     typer.echo(f"{command}: not implemented", err=True)
     raise typer.Exit(1)
@@ -61,6 +74,7 @@ def load() -> None:
 @app.command()
 def resolve() -> None:
     """Resolve the watchlist against the Torvik player season file."""
+    _load_watchlist()
     _not_implemented("resolve")
 
 
@@ -92,6 +106,7 @@ def run(
     dry_run: DryRunOption = False,
 ) -> None:
     """Fetch, load, resolve, compute, render and send one week, then ping healthchecks."""
+    _load_watchlist()
     _not_implemented("run")
 
 
