@@ -95,7 +95,7 @@ def test_upgrade_twice_is_a_no_op(url: str) -> None:
     db.upgrade(url)
 
     assert _schema_sql(url) == schema
-    assert _version(url) == version == ["0003"]
+    assert _version(url) == version == ["0004"]
 
 
 def test_baseline_reruns_over_existing_tables(url: str) -> None:
@@ -112,7 +112,7 @@ def test_baseline_reruns_over_existing_tables(url: str) -> None:
 
     # A batch rebuild (0002) may reorder a table's constraints, but not change them.
     assert _unordered(_schema_sql(url)) == schema
-    assert _version(url) == ["0003"]
+    assert _version(url) == ["0004"]
 
 
 def test_migrations_contain_no_alembic_tmp_statements() -> None:
@@ -203,7 +203,7 @@ def test_0002_reruns_to_the_same_table(url: str) -> None:
     db.upgrade(url)
 
     assert _unordered(_schema_sql(url)) == before
-    assert _version(url) == ["0003"]
+    assert _version(url) == ["0004"]
 
 
 def _game_columns(url: str) -> list[str]:
@@ -227,8 +227,47 @@ def test_0003_adds_the_side_names_reruns_and_downgrades(url: str) -> None:
     engine.dispose()
     db.upgrade(url)
     assert _schema_sql(url) == after
-    assert _version(url) == ["0003"]
+    assert _version(url) == ["0004"]
 
     db.downgrade(url, "0002")
     assert not {"home_name", "away_name"} & set(_game_columns(url))
     assert _version(url) == ["0002"]
+
+
+def _resolution_columns(url: str) -> list[str]:
+    engine = db.create_engine(url)
+    columns = [column["name"] for column in inspect(engine).get_columns("watchlist_resolution")]
+    engine.dispose()
+    return columns
+
+
+def test_0004_adds_inactive_run_id_with_its_foreign_key_reruns_and_downgrades(url: str) -> None:
+    db.upgrade(url, "0003")
+    assert "inactive_run_id" not in _resolution_columns(url)
+
+    db.upgrade(url)
+    after = _unordered(_schema_sql(url))
+    assert "inactive_run_id" in _resolution_columns(url)
+    engine = db.create_engine(url)
+    foreign_keys = inspect(engine).get_foreign_keys("watchlist_resolution")
+    engine.dispose()
+    assert {
+        "name": "fk_watchlist_resolution_inactive_run_id_runs",
+        "referred_table": "runs",
+        "constrained_columns": ["inactive_run_id"],
+        "referred_columns": ["run_id"],
+    }.items() <= next(
+        fk for fk in foreign_keys if fk["constrained_columns"] == ["inactive_run_id"]
+    ).items()
+
+    engine = db.create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE alembic_version SET version_num = '0003'"))
+    engine.dispose()
+    db.upgrade(url)
+    assert _unordered(_schema_sql(url)) == after
+    assert _version(url) == ["0004"]
+
+    db.downgrade(url, "0003")
+    assert "inactive_run_id" not in _resolution_columns(url)
+    assert _version(url) == ["0003"]

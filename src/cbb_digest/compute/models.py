@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from cbb_digest.resolve import Alert
+
 type MoverKind = Literal["moved", "entered", "left"]
 type Tier = Literal[1, 2, 3]
 
@@ -87,3 +89,39 @@ class MoversSection(_Model):
     rows: list[Mover] = []
     more_count: int = 0
     baseline: bool = False
+
+
+class WatchlistWeekRow(_Model):
+    """One resolved watchlist player whose team played last week (spec §5, section 2).
+
+    `name` is Torvik's spelling and `team_name` CBBD's. The per-game figures are over the games
+    the player played last week, and are all 0 for a player who did not play (`games == 0`).
+    `true_shooting` is a fraction (0.62 for `TS 62%`), and `None` when the player took no
+    field-goal or free-throw attempts. `notable` is the one §8.4 flag, if any.
+    """
+
+    name: str
+    torvik_pid: int
+    tier: Tier
+    team_slug: str
+    team_name: str
+    games: int
+    minutes_per_game: float
+    points_per_game: float
+    rebounds_per_game: float
+    assists_per_game: float
+    true_shooting: float | None
+    threes_attempted_per_game: float
+    notable: str | None
+
+
+class WatchlistWeekSection(_Model):
+    """Section 2: at most 40 rows, and how many more qualified.
+
+    `alerts` are the `inactive` alerts this run raised (§7.4); the email shows them in the alerts
+    section, not here.
+    """
+
+    rows: list[WatchlistWeekRow] = []
+    more_count: int = 0
+    alerts: list[Alert] = []

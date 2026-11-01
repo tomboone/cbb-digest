@@ -50,7 +50,13 @@ from cbb_digest.weeks import Windows
 FUZZY_THRESHOLD = 90
 
 type Outcome = Literal["resolved", "unresolved", "ambiguous"]
-type AlertKind = Literal["unresolved", "ambiguous", "team_changed", "fuzzy_match", "unmapped_team"]
+type ResolutionAlertKind = Literal[
+    "unresolved", "ambiguous", "team_changed", "fuzzy_match", "unmapped_team"
+]
+# `inactive` is raised by the compute step from the game logs, not by resolution (§7.4).
+type AlertKind = Literal[
+    "unresolved", "ambiguous", "team_changed", "fuzzy_match", "unmapped_team", "inactive"
+]
 
 NOT_IN_FILE = "not in Torvik's file"
 NOT_YET_PLAYED = "not yet in Torvik's file (team has not played)"
@@ -79,7 +85,7 @@ class Resolution:
     torvik_pid: int | None = None
     team_slug: str | None = None
     matched_name: str | None = None
-    alert_kind: AlertKind | None = None
+    alert_kind: ResolutionAlertKind | None = None
     alert_detail: str | None = None
 
 
@@ -270,7 +276,7 @@ def _resolve_one(
 
 
 def _resolved(
-    player: _Player, kind: AlertKind | None = None, detail: str | None = None
+    player: _Player, kind: ResolutionAlertKind | None = None, detail: str | None = None
 ) -> Resolution:
     return Resolution(
         "resolved",
