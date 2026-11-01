@@ -1,0 +1,23 @@
+.venv
+*.log
+logs/
+.git
+.idea
+tests/
+
+# Local secrets, caches, and editor state that have no place in the build context.
+.env
+.vscode
+.DS_Store
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.coverage
+
+# Docs, CI config, the local data volume and dry-run output; none of it is read by the build.
+.claude
+.github
+docs/
+data/
+deploy/
+out/
