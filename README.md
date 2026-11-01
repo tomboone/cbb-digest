@@ -17,8 +17,8 @@ and [`docs/adr/`](docs/adr/) for the design decisions. The watchlist is
 
 | Command | Does |
 |---|---|
-| `cbb-digest fetch` | Fetches every source for the run window into a 24 h cache |
-| `cbb-digest load` | Parses the cache and upserts it into SQLite |
+| `cbb-digest fetch [--week YYYY-MM-DD] [--refresh-teams]` | Fetches every source for the run window into a 24 h cache |
+| `cbb-digest load [--week YYYY-MM-DD]` | Parses the cache and upserts it into SQLite; a second `load` changes nothing |
 | `cbb-digest resolve` | Resolves the watchlist against Torvik's player file |
 | `cbb-digest compute` | Builds the digest model |
 | `cbb-digest render [--dry-run]` | Renders the digest to HTML and text |

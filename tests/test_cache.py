@@ -88,6 +88,23 @@ def test_entry_survives_a_new_cache_instance(tmp_path: Path, clock: FakeClock) -
     assert fetch.calls == 1
 
 
+def test_peek_reads_a_fresh_entry_without_fetching(cache: ResponseCache, clock: FakeClock) -> None:
+    fetch = CountingFetch()
+    stored = cache.get_or_fetch("torvik", "season-2027", fetch)
+    clock.advance(timedelta(hours=23))
+
+    assert cache.peek("torvik", "season-2027") == stored
+    assert cache.peek("torvik", "season-2026") is None
+    assert fetch.calls == 1
+
+
+def test_peek_ignores_an_expired_entry(cache: ResponseCache, clock: FakeClock) -> None:
+    cache.get_or_fetch("torvik", "season-2027", CountingFetch())
+    clock.advance(timedelta(hours=24))
+
+    assert cache.peek("torvik", "season-2027") is None
+
+
 def test_keys_are_independent(cache: ResponseCache) -> None:
     fetch = CountingFetch()
 

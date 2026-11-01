@@ -10,7 +10,7 @@ the source client must see that redirect rather than the home page.
 
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import override
 
 import httpx
@@ -32,6 +32,9 @@ class RetryTransport(httpx.BaseTransport):
 
     After the last retry a 5xx response is returned as-is and a connect error is re-raised,
     so the caller sees the same outcome it would have without retries.
+
+    `on_attempt`, if given, is called before every attempt, retries included: each is a request
+    on the wire, and counts against the run's budget and CBBD's quota (spec §6).
     """
 
     def __init__(
@@ -40,15 +43,19 @@ class RetryTransport(httpx.BaseTransport):
         *,
         retries: int = RETRIES,
         backoff: float = BACKOFF_SECONDS,
+        on_attempt: Callable[[httpx.Request], None] | None = None,
     ) -> None:
         self._inner = inner
         self._retries = retries
         self._backoff = backoff
+        self._on_attempt = on_attempt
 
     @override
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         for attempt in range(self._retries + 1):
             last = attempt == self._retries
+            if self._on_attempt is not None:
+                self._on_attempt(request)
             try:
                 response = self._inner.handle_request(request)
             except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
@@ -78,11 +85,13 @@ def make_client(
     *,
     user_agent: str = USER_AGENT,
     headers: Mapping[str, str] | None = None,
+    on_request: Callable[[httpx.Request], None] | None = None,
 ) -> httpx.Client:
+    """A client for `base_url`. `on_request` is called for every request sent, retries included."""
     return httpx.Client(
         base_url=base_url,
         headers={"User-Agent": user_agent, **(headers or {})},
         timeout=TIMEOUT_SECONDS,
         follow_redirects=False,
-        transport=RetryTransport(httpx.HTTPTransport()),
+        transport=RetryTransport(httpx.HTTPTransport(), on_attempt=on_request),
     )

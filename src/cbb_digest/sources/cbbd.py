@@ -9,6 +9,8 @@ so it never surfaces as a 401 source failure. A 401 from a key CBBD has revoked 
 failure like any other HTTP error.
 """
 
+from collections.abc import Callable
+
 import httpx
 from pydantic import SecretStr
 
@@ -26,15 +28,29 @@ RATINGS_PATH = "/ratings/adjusted"
 ROSTERS_PATH = "/teams/roster"
 
 
-def make_cbbd_client(api_key: SecretStr) -> httpx.Client:
-    return make_client(BASE_URL, headers={"Authorization": f"Bearer {api_key.get_secret_value()}"})
+def teams_cache_key(season: int) -> str:
+    return f"teams-{season}"
+
+
+def ratings_cache_key(season: int) -> str:
+    return f"ratings-adjusted-{season}"
+
+
+def make_cbbd_client(
+    api_key: SecretStr, on_request: Callable[[httpx.Request], None] | None = None
+) -> httpx.Client:
+    return make_client(
+        BASE_URL,
+        headers={"Authorization": f"Bearer {api_key.get_secret_value()}"},
+        on_request=on_request,
+    )
 
 
 def fetch_teams(client: httpx.Client, cache: ResponseCache, season: int) -> Fetched[list[CbbdTeam]]:
     """Every D-I team for `season`, the seed of the canonical teams (spec §7.5)."""
     return fetch_source(
         SOURCE,
-        f"teams-{season}",
+        teams_cache_key(season),
         lambda: client.get(TEAMS_PATH, params={"season": str(season)}),
         parse_teams,
         cache,
@@ -47,7 +63,7 @@ def fetch_adjusted_ratings(
     """Each D-I team's adjusted ratings; `[]` until the season's first games are played."""
     return fetch_source(
         SOURCE,
-        f"ratings-adjusted-{season}",
+        ratings_cache_key(season),
         lambda: client.get(RATINGS_PATH, params={"season": str(season)}),
         parse_ratings,
         cache,

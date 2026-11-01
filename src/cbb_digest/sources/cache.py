@@ -78,6 +78,14 @@ class ResponseCache:
         log.info("cache stored", extra={"source": source, "key": key, "bytes": len(fresh.body)})
         return fresh
 
+    def peek(self, source: str, key: str, ttl: timedelta = TTL) -> CachedResponse | None:
+        """The stored entry if it is younger than `ttl`, else `None`; never fetches. For whether
+        an entry is there, or for its metadata, such as when it was fetched."""
+        cached = self._read(self._path(source, key))
+        if cached is None or self._clock.now() - cached.fetched_at >= ttl:
+            return None
+        return cached
+
     def evict(self, source: str, key: str) -> None:
         """Drop an entry, e.g. one whose body failed validation, so the next call refetches."""
         self._path(source, key).unlink(missing_ok=True)

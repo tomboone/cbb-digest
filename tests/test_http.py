@@ -117,6 +117,17 @@ def test_sends_user_agent_extra_headers_and_sets_timeout() -> None:
     assert request.headers["User-Agent"] == http.USER_AGENT
 
 
+@respx.mock
+def test_on_request_sees_every_attempt_including_retries() -> None:
+    respx.get(f"{BASE}/teams").mock(return_value=httpx.Response(503))
+    sent: list[httpx.Request] = []
+
+    with make_client(BASE, on_request=sent.append) as c:
+        c.get("/teams")
+
+    assert len(sent) == 1 + http.RETRIES
+
+
 def test_default_user_agent_is_a_browser() -> None:
     assert http.USER_AGENT.startswith("Mozilla/5.0 ")
     assert "Chrome/" in http.USER_AGENT

@@ -9,6 +9,8 @@ Before a season's game logs are published, their URL 302-redirects to `/`. The c
 follow redirects, and reads that one as an empty game log; any other redirect is a failure.
 """
 
+from collections.abc import Callable
+
 import httpx
 
 from cbb_digest.sources.cache import ResponseCache
@@ -25,8 +27,8 @@ SOURCE = "torvik"
 PLAYER_SEASON_PATH = "/getadvstats.php"
 
 
-def make_torvik_client() -> httpx.Client:
-    return make_client(BASE_URL)
+def make_torvik_client(on_request: Callable[[httpx.Request], None] | None = None) -> httpx.Client:
+    return make_client(BASE_URL, on_request=on_request)
 
 
 def player_games_path(season: int) -> str:

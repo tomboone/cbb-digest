@@ -160,8 +160,8 @@ def test_fixture_parses_to_games_with_networks(client: httpx.Client, cache: Resp
     assert games[0] == EspnGame(
         espn_id="401906848",
         start=datetime(2026, 11, 3, 23, 0, tzinfo=UTC),
-        home=EspnTeam(espn_id="2633", name="Tennessee"),
-        away=EspnTeam(espn_id="2747", name="Wofford"),
+        home=EspnTeam(espn_id="2633", name="Tennessee", conference_id="23"),
+        away=EspnTeam(espn_id="2747", name="Wofford", conference_id="24"),
         venue="Food City Center",
         networks=["SEC Network"],
         status="STATUS_SCHEDULED",
@@ -220,7 +220,22 @@ def test_missing_optional_fields_are_tolerated(client: httpx.Client, cache: Resp
     assert isinstance(games, list)
     assert games[0].venue is None
     assert games[0].status is None
-    assert games[0].home == EspnTeam(espn_id="2633", name=None)
+    assert games[0].home == EspnTeam(espn_id="2633", name=None, conference_id="23")
+
+
+@respx.mock
+def test_a_team_with_no_conference_is_not_division_one(
+    client: httpx.Client, cache: ResponseCache
+) -> None:
+    body = _edited(
+        lambda event: event["competitions"][0]["competitors"][1]["team"].pop("conferenceId")
+    )
+
+    games = _week_of(body, client, cache)
+
+    assert isinstance(games, list)
+    sides = {games[0].home.is_division_one, games[0].away.is_division_one}
+    assert sides == {True, False}
 
 
 def _drop_team_id(event: dict[str, Any]) -> None:
