@@ -70,6 +70,14 @@ def test_missing_cbbd_api_key_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
         Settings()
 
 
+def test_blank_cbbd_api_key_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CBBD_API_KEY", "   ")
+    monkeypatch.setenv("RECIPIENTS", "fan@example.com")
+
+    with pytest.raises(ValidationError, match="CBBD_API_KEY is blank"):
+        Settings()
+
+
 def test_missing_recipients_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CBBD_API_KEY", "key")
 
