@@ -28,7 +28,7 @@ Tom follows the NBA, not college basketball. cbb-digest emails him one Monday-mo
 | Scheduler | In-app: `cbb-digest serve` sleeps until Monday 07:00 `America/New_York`. Restart-safe through the `runs` table (ADR-0001). |
 | Storage | SQLite file `/data/cbb-digest.sqlite3`, SQLAlchemy core + Alembic in batch mode (ADR-0001). |
 | Backup | Host systemd timer, nightly: `sqlite3 .backup` → `PRAGMA integrity_check` → USB drive → `rclone sync` to B2 → Kuma push. Cloned from closinglineup's `deploy/backup/`. |
-| Team ratings | CBBD adjusted net rating. **Rank** = position by net rating, which CBBD supplies as `rankings.net` (ADR-0002). |
+| Team ratings | CBBD adjusted net rating. **Rank** = position 1..N by net rating, highest first; teams with equal net rating keep CBBD's list order (ADR-0002). CBBD's own `rankings.net` gives tied teams the same rank and is not used. |
 | Player stats | Torvik player season file (plain GET, CSV) and player game logs (plain GET, gzipped JSON). |
 | Schedule and TV | ESPN unofficial scoreboard. |
 | Email | Jinja2 → MJML → `mjml-python`, plus a Jinja2 text part. Port nba-today's `render/`. |

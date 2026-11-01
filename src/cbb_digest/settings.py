@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     def _parse_csv(cls, value: object) -> object:
         return _split_csv(value)
 
+    @field_validator("cbbd_api_key")
+    @classmethod
+    def _reject_blank_key(cls, value: SecretStr) -> SecretStr:
+        # An unset or empty variable is already "missing"; this catches one that is only spaces,
+        # which would otherwise surface on the first run as a CBBD 401 source failure.
+        if not value.get_secret_value().strip():
+            raise ValueError("CBBD_API_KEY is blank")
+        return value
+
     @field_validator("log_level", mode="before")
     @classmethod
     def _upper_log_level(cls, value: object) -> object:
