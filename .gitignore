@@ -1,0 +1,26 @@
+# Python environments
+.env
+.venv/
+env/
+venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data volume (cache, SQLite, out/)
+/data/
+/deploy/data/
+/out/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
