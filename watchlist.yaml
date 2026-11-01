@@ -7,4 +7,186 @@
 #     class: 2027       # expected draft year; must be >= season
 #     note: "optional free text"
 season: 2027          # season end year
-players: []
+
+# Seeded 2026-11-01 (NEU-2105) from a consensus of three public 2027 boards. College players only;
+# kept a name only if it appears on at least two boards. Ordered by mean rank. Tier 1 = consensus
+# top 10, tier 2 = 11-25, tier 3 = 26-35. Notes give each board's rank as Tankathon / B/R / CBS
+# (CBS shows only its top 30; "—" = not on that board):
+#   Tankathon big board (updated ~2026-10-20), Bleacher Report top 100 (Wasserman, 2026-08-25),
+#   CBS Sports prospect rankings (undated).
+players:
+  - name: Tyran Stokes
+    team: "Kansas"
+    tier: 1
+    class: 2027
+    note: "1 / 1 / 1"
+  - name: Jordan Smith Jr.
+    team: "Arkansas"
+    tier: 1
+    class: 2027
+    note: "3 / 2 / 2"
+  - name: Caleb Holt
+    team: "Arizona"
+    tier: 1
+    class: 2027
+    note: "2 / 3 / 4"
+  - name: Bruce Branch III
+    team: "BYU"
+    tier: 1
+    class: 2027
+    note: "5 / 8 / 5"
+  - name: Braylon Mullins
+    team: "UConn"
+    tier: 1
+    class: 2027
+    note: "13 / 7 / 8"
+  - name: Amari Allen
+    team: "Alabama"
+    tier: 1
+    class: 2027
+    note: "11 / 12 / 6"
+  - name: Anthony Thompson
+    team: "Ohio State"
+    tier: 1
+    class: 2027
+    note: "6 / 6 / 23"
+  - name: Motiejus Krivas
+    team: "Arizona"
+    tier: 1
+    class: 2027
+    note: "22 / 9 / 7"
+  - name: Baba Oladotun
+    team: "Maryland"
+    tier: 1
+    class: 2027
+    note: "8 / 18 / —"
+  - name: Patrick Ngongba II
+    team: "Duke"
+    tier: 1
+    class: 2027
+    note: "17 / 13 / 9"
+  - name: Dylan Mingo
+    team: "Baylor"
+    tier: 2
+    class: 2027
+    note: "12 / 15 / —"
+  - name: Ivan Kharchenkov
+    team: "Arizona"
+    tier: 2
+    class: 2027
+    note: "15 / 16 / 11"
+  - name: Brandon McCoy Jr.
+    team: "Michigan"
+    tier: 2
+    class: 2027
+    note: "9 / 20 / —"
+  - name: Cameron Williams
+    team: "Duke"
+    tier: 2
+    class: 2027
+    note: "7 / 23 / 17"
+  - name: Jason Crowe Jr.
+    team: "Missouri"
+    tier: 2
+    class: 2027
+    note: "14 / 14 / 20"
+  - name: Quentin Coleman
+    team: "Illinois"
+    tier: 2
+    class: 2027
+    note: "16 / 19 / 15"
+  - name: Luigi Suigo
+    team: "Villanova"
+    tier: 2
+    class: 2027
+    note: "20 / 17 / 16"
+  - name: JJ Andrews
+    team: "Arkansas"
+    tier: 2
+    class: 2027
+    note: "23 / 5 / 27"
+  - name: Thomas Haugh
+    team: "Florida"
+    tier: 2
+    class: 2027
+    note: "18 / 27 / 10"
+  - name: Miikka Muurinen
+    team: "Arkansas"
+    tier: 2
+    class: 2027
+    note: "21 / 22 / —"
+  - name: Alijah Arenas
+    team: "USC"
+    tier: 2
+    class: 2027
+    note: "28 / 28 / 12"
+  - name: Arafan Diane
+    team: "Houston"
+    tier: 2
+    class: 2027
+    note: "— / 34 / 14"
+  - name: Davis Fogle
+    team: "Gonzaga"
+    tier: 2
+    class: 2027
+    note: "25 / 29 / 18"
+  - name: Tounde Yessoufou
+    team: "St. John's"
+    tier: 2
+    class: 2027
+    note: "19 / 32 / 30"
+  - name: Tyler Tanner
+    team: "Vanderbilt"
+    tier: 2
+    class: 2027
+    note: "26 / 31 / —"
+  - name: Malachi Moreno
+    team: "Kentucky"
+    tier: 3
+    class: 2027
+    note: "32 / 33 / 22"
+  - name: David Mirkovic
+    team: "Illinois"
+    tier: 3
+    class: 2027
+    note: "29 / 42 / 19"
+  - name: Dame Sarr
+    team: "Duke"
+    tier: 3
+    class: 2027
+    note: "44 / 40 / 13"
+  - name: Billy Richmond III
+    team: "Arkansas"
+    tier: 3
+    class: 2027
+    note: "27 / 54 / 21"
+  - name: Alex Condon
+    team: "Florida"
+    tier: 3
+    class: 2027
+    note: "34 / 36 / —"
+  - name: Matt Able
+    team: "North Carolina"
+    tier: 3
+    class: 2027
+    note: "38 / 45 / 24"
+  - name: Trey McKenney
+    team: "Michigan"
+    tier: 3
+    class: 2027
+    note: "30 / 44 / —"
+  - name: Juke Harris
+    team: "Tennessee"
+    tier: 3
+    class: 2027
+    note: "37 / 39 / —"
+  - name: Matas Vokietaitis
+    team: "Texas"
+    tier: 3
+    class: 2027
+    note: "50 / — / 28"
+  - name: Milan Momcilovic
+    team: "Kentucky"
+    tier: 3
+    class: 2027
+    note: "31 / 47 / —"
