@@ -4,6 +4,7 @@ import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from cbb_digest import db
 from cbb_digest.schema import metadata
@@ -35,6 +36,16 @@ def _schema_sql(url: str) -> list[tuple[str, str, str | None]]:
         result = [(row.type, row.name, row.sql) for row in rows]
     engine.dispose()
     return result
+
+
+def _unordered(
+    schema: list[tuple[str, str, str | None]],
+) -> list[tuple[str, str, list[str] | None]]:
+    """`schema` with each definition's lines sorted, so a reordered constraint compares equal."""
+    return [
+        (kind, name, sorted(line.strip().rstrip(",") for line in sql.splitlines()) if sql else None)
+        for kind, name, sql in schema
+    ]
 
 
 def _version(url: str) -> list[str]:
@@ -84,14 +95,14 @@ def test_upgrade_twice_is_a_no_op(url: str) -> None:
     db.upgrade(url)
 
     assert _schema_sql(url) == schema
-    assert _version(url) == version == ["0001"]
+    assert _version(url) == version == ["0002"]
 
 
 def test_baseline_reruns_over_existing_tables(url: str) -> None:
     # Spec §9.4: every migration is idempotent, so a database whose version row was lost (or
     # whose tables were created by a half-run migration) still upgrades cleanly.
     db.upgrade(url)
-    schema = _schema_sql(url)
+    schema = _unordered(_schema_sql(url))
     engine = db.create_engine(url)
     with engine.begin() as connection:
         connection.execute(text("DELETE FROM alembic_version"))
@@ -99,8 +110,9 @@ def test_baseline_reruns_over_existing_tables(url: str) -> None:
 
     db.upgrade(url)
 
-    assert _schema_sql(url) == schema
-    assert _version(url) == ["0001"]
+    # A batch rebuild (0002) may reorder a table's constraints, but not change them.
+    assert _unordered(_schema_sql(url)) == schema
+    assert _version(url) == ["0002"]
 
 
 def test_migrations_contain_no_alembic_tmp_statements() -> None:
@@ -141,3 +153,54 @@ def test_a_migration_that_leaves_dangling_foreign_keys_rolls_back(url: str) -> N
     engine = db.create_engine(url)
     assert "alembic_version" not in inspect(engine).get_table_names()
     engine.dispose()
+
+
+def test_unmapped_team_alerts_need_0002_and_its_downgrade_drops_them(url: str) -> None:
+    db.upgrade(url)
+    engine = db.create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO runs (run_id, kind, season, status, started_at)"
+                " VALUES ('2027-W45', 'digest', 2027, 'running', '2026-11-02 12:00:00')"
+            )
+        )
+        for key, kind in (("a|?x", "unmapped_team"), ("b|—", "unresolved")):
+            connection.execute(
+                text(
+                    "INSERT INTO watchlist_resolution (season, watchlist_key, outcome, alert_kind,"
+                    " first_run_id, changed_run_id)"
+                    " VALUES (2027, :key, 'unresolved', :kind, '2027-W45', '2027-W45')"
+                ),
+                {"key": key, "kind": kind},
+            )
+    engine.dispose()
+
+    db.downgrade(url, "0001")
+
+    engine = db.create_engine(url)
+    with engine.connect() as connection:
+        keys = connection.execute(text("SELECT watchlist_key FROM watchlist_resolution"))
+        assert keys.scalars().all() == ["b|—"]
+    with pytest.raises(IntegrityError), engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE watchlist_resolution SET alert_kind = 'unmapped_team'"
+                " WHERE watchlist_key = 'b|—'"
+            )
+        )
+    engine.dispose()
+
+
+def test_0002_reruns_to_the_same_table(url: str) -> None:
+    db.upgrade(url)
+    before = _unordered(_schema_sql(url))
+    engine = db.create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE alembic_version SET version_num = '0001'"))
+    engine.dispose()
+
+    db.upgrade(url)
+
+    assert _unordered(_schema_sql(url)) == before
+    assert _version(url) == ["0002"]

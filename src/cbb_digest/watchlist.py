@@ -34,6 +34,8 @@ WATCHLIST_PATH = Path(__file__).resolve().parents[2] / "watchlist.yaml"
 SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv"})
 # The team part of the watchlist key when the entry states no team (§7.3).
 NO_TEAM = "—"
+# Prefixes the stated team in the key of an entry whose team does not map (§7.3).
+UNMAPPED_MARK = "?"
 
 # `\u2019` is the right single quotation mark, a typographic apostrophe.
 _REMOVED_CHARACTERS = re.compile("[.'\u2019]")
@@ -138,6 +140,18 @@ def watchlist_key(player: WatchlistPlayer, team_slug: str | None) -> str:
             f"of {player.name!r}"
         )
     return f"{normalise_name(player.name)}|{team_slug or NO_TEAM}"
+
+
+def unmapped_watchlist_key(player: WatchlistPlayer) -> str:
+    """The key of a player whose stated team the crosswalk cannot map: the normalised name and
+    `?` + the team as written, casefolded. `tyran stokes|?kanzas`.
+
+    A slug never starts with `?` and `—` is not one, so this key cannot collide with a mapped or
+    a blank-team entry. Once the team maps, the entry gets its `watchlist_key` and a new row.
+    """
+    if player.team is None:
+        raise ValueError(f"{player.name!r} states no team")
+    return f"{normalise_name(player.name)}|{UNMAPPED_MARK}{player.team.strip().casefold()}"
 
 
 def load_watchlist(path: Path | None = None) -> Watchlist:

@@ -26,6 +26,8 @@ from cbb_digest.collect import (
 from cbb_digest.load import TABLES, LoadError, LoadInput, TableReport, stored_cbbd_teams
 from cbb_digest.load import load as load_sources
 from cbb_digest.logging import configure_logging
+from cbb_digest.resolve import Entry, ResolveError
+from cbb_digest.resolve import resolve as resolve_watchlist
 from cbb_digest.scheduler import Scheduler
 from cbb_digest.schema import teams
 from cbb_digest.settings import Settings
@@ -210,10 +212,62 @@ def load(week: WeekOption = None) -> None:
 
 
 @app.command()
-def resolve() -> None:
-    """Resolve the watchlist against the Torvik player season file."""
-    _load_watchlist()
-    _not_implemented("resolve")
+def resolve(week: WeekOption = None) -> None:
+    """Resolve the watchlist against the Torvik player season file; print every entry and its
+    alerts, marking with `*` the ones this run raised."""
+    wl = _load_watchlist()
+    settings = _bootstrap()
+    monday = _monday(week)
+    run_id = run_id_for(monday, wl.season)
+    engine = db.open_database(settings.data_dir)
+    try:
+        with engine.begin() as connection:
+            report = resolve_watchlist(
+                connection,
+                wl,
+                run_id=run_id,
+                windows=windows_for(monday),
+                now=SystemClock().now(),
+            )
+    except ResolveError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    finally:
+        engine.dispose()
+
+    typer.echo(f"week of {monday.isoformat()}, run {run_id}")
+    for line in _resolution_table(report.entries):
+        typer.echo(line)
+    typer.echo(f"new alerts: {len(report.alerts)}")
+    for alert in report.alerts:
+        typer.echo(f"  {alert}")
+
+
+def _resolution_table(entries: list[Entry]) -> list[str]:
+    rows = [("NAME", "TEAM", "TIER", "OUTCOME", "MATCH", "ALERT")]
+    for entry in entries:
+        resolution = entry.resolution
+        match = "—"
+        if resolution.torvik_pid is not None:
+            match = f"{resolution.matched_name} ({resolution.team_slug}, {resolution.torvik_pid})"
+        alert = ""
+        if entry.alert is not None:
+            alert = f"{'*' if entry.new else ' '} {entry.alert.kind} ({entry.alert.detail})"
+        rows.append(
+            (
+                entry.player.name,
+                entry.player.team or "—",
+                str(entry.player.tier),
+                resolution.outcome,
+                match,
+                alert,
+            )
+        )
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]) - 1)]
+    return [
+        "  ".join(cell.ljust(width) for cell, width in zip(row, [*widths, 0], strict=True)).rstrip()
+        for row in rows
+    ]
 
 
 @app.command()
