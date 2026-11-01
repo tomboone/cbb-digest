@@ -26,6 +26,8 @@ class _Model(BaseModel):
 class _Team(_Model):
     id: str
     location: str | None = None
+    # Absent for a non-D-I team (spec §6, §7.5).
+    conference_id: str | None = None
 
 
 class _Competitor(_Model):
@@ -71,6 +73,12 @@ class _Scoreboard(_Model):
 class EspnTeam:
     espn_id: str
     name: str | None
+    # `None` for a non-D-I team, which the crosswalk does not hold and which raises no alert.
+    conference_id: str | None = None
+
+    @property
+    def is_division_one(self) -> bool:
+        return self.conference_id is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,11 +113,15 @@ def _game(event: _Event) -> EspnGame:
     return EspnGame(
         espn_id=event.id,
         start=event.date.astimezone(UTC),
-        home=EspnTeam(espn_id=home.id, name=home.location),
-        away=EspnTeam(espn_id=away.id, name=away.location),
+        home=_team(home),
+        away=_team(away),
         venue=competition.venue.full_name if competition.venue is not None else None,
         networks=list(
             dict.fromkeys(name for broadcast in competition.broadcasts for name in broadcast.names)
         ),
         status=status_type.name if status_type is not None else None,
     )
+
+
+def _team(team: _Team) -> EspnTeam:
+    return EspnTeam(espn_id=team.id, name=team.location, conference_id=team.conference_id)

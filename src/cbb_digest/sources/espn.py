@@ -9,6 +9,7 @@ Any day that fails fails the week: a schedule missing a day is never served (spe
 fetched before the failure stay cached, so the retry refetches only the rest.
 """
 
+from collections.abc import Callable
 from datetime import date, timedelta
 
 import httpx
@@ -26,8 +27,8 @@ SCOREBOARD_PARAMS = {"groups": "50", "limit": "1000"}
 DAYS_PER_WEEK = 7
 
 
-def make_espn_client() -> httpx.Client:
-    return make_client(BASE_URL)
+def make_espn_client(on_request: Callable[[httpx.Request], None] | None = None) -> httpx.Client:
+    return make_client(BASE_URL, on_request=on_request)
 
 
 def fetch_week(client: httpx.Client, cache: ResponseCache, start: date) -> Fetched[list[EspnGame]]:

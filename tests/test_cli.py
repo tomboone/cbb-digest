@@ -41,8 +41,6 @@ def test_help_lists_commands() -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        ["fetch"],
-        ["load"],
         ["resolve"],
         ["compute"],
         ["render", "--dry-run"],
@@ -71,7 +69,9 @@ def test_run_rejects_a_malformed_week() -> None:
     assert result.exit_code == 2
 
 
-@pytest.mark.parametrize("args", [["resolve"], ["run", "--week", "2026-11-09"]])
+@pytest.mark.parametrize(
+    "args", [["fetch"], ["load"], ["resolve"], ["run", "--week", "2026-11-09"]]
+)
 def test_an_invalid_watchlist_stops_the_command_listing_every_error(
     args: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

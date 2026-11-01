@@ -4,10 +4,10 @@ This module is the current shape of the schema; the migrations under `migrations
 how a database gets there. `tests/test_migrations.py` fails if the two disagree.
 
 Team columns are slugs from `teams`. A source team name with no crosswalk entry never reaches a
-table as a slug (spec §7.4); a game against such a team stores NULL for that side. The one
-exception is `player_games.opponent_slug`: `teams` is D-I only (§7.5), and a game against a
-non-D-I opponent still counts towards §8.4's "the team played" and "season games played", so that
-column is part of the key but deliberately not a foreign key.
+table as a slug (spec §7.4); an ESPN game against such a team stores NULL for that side.
+`player_games.opponent_slug` is part of the key and not a foreign key. Torvik's game logs hold
+only D-I vs D-I games (§6), so the loader drops a game whose opponent the crosswalk cannot map,
+as it drops any unmapped row: that is a crosswalk gap (`unmapped_team`), not a non-D-I opponent.
 """
 
 from datetime import UTC, datetime
