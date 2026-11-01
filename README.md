@@ -50,6 +50,9 @@ docker build -t cbb-digest .
 docker run --rm cbb-digest --help
 ```
 
+It runs on kumadrome from [`deploy/`](deploy/); [`deploy/README.md`](deploy/README.md) is the
+runbook.
+
 ## License
 
 MIT; see [`LICENSE`](LICENSE).
