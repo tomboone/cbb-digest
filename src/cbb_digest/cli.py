@@ -14,6 +14,7 @@ from pathlib import Path
 from types import FrameType
 from typing import Annotated, NoReturn
 
+import httpx
 import typer
 from pydantic import ValidationError
 from sqlalchemy import Engine, select
@@ -33,6 +34,7 @@ from cbb_digest.collect import (
 )
 from cbb_digest.compute.build import Source, build_digest, failed_sources
 from cbb_digest.compute.models import Digest
+from cbb_digest.heartbeat import Heartbeat, failure_reason, report_run
 from cbb_digest.load import (
     TABLES,
     LoadError,
@@ -608,15 +610,22 @@ def run(
     that has already gone out by email is refused, exiting 1, unless `--force`. `--dry-run` (or
     `DRY_RUN=true`) sends to the outbox under `DATA_DIR` instead of by email; it is never refused,
     and never replaces the record of a real send.
+
+    However it ends, the run pings `HEALTHCHECKS_URL`: success with its status, or `/fail` with
+    the reason. `--dry-run` never pings, being manual; `DRY_RUN=true` does, since the scheduled
+    run `serve` dispatches under it is still a Monday healthchecks must hear from.
     """
     wl = _load_watchlist()
     settings = _bootstrap()
+    heartbeat_url = None if dry_run else settings.healthchecks_url
     if dry_run:
         settings = settings.model_copy(update={"dry_run": True})
     monday = _monday(week)
     run_id = run_id_for(monday, wl.season)
     transport = _transport(settings, run_id)
     engine = db.open_database(settings.data_dir)
+    http = httpx.Client()
+    heartbeat = Heartbeat(heartbeat_url, http)
     try:
         _refuse_if_sent(engine, settings, run_id, force=force)
         with engine.begin() as connection:
@@ -642,7 +651,7 @@ def run(
                 clock=SystemClock(),
                 retry=not no_retry,
             )
-        except Exception:
+        except Exception as exc:
             # §9.3: anything that stops the run records it as failed. `sent_at` survives, so a
             # crash after the email went out still refuses a second send.
             with engine.begin() as connection:
@@ -657,8 +666,17 @@ def run(
                     now=SystemClock().now(),
                 )
             log.exception("run failed", extra={"run_id": run_id})
+            report_run(
+                heartbeat,
+                run_id=run_id,
+                status="failed",
+                failed_sources=record.failed_sources,
+                reason=failure_reason(exc),
+            )
             raise
+        report_run(heartbeat, run_id=run_id, status=status, failed_sources=record.failed_sources)
     finally:
+        http.close()
         engine.dispose()
     typer.echo(f"status: {status}")
 
@@ -756,6 +774,7 @@ def serve() -> None:
     # Docker stops a container with SIGTERM; wake from the current sleep and exit 0.
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, on_signal)
+    http = httpx.Client()
     try:
         Scheduler(
             SystemClock(stop),
@@ -764,9 +783,11 @@ def serve() -> None:
             run_week=_run_scheduled,
             dry_run=settings.dry_run,
             image_sha=settings.image_sha,
+            heartbeat=Heartbeat(settings.healthchecks_url, http),
             stop=stop,
         ).run_forever()
     finally:
+        http.close()
         engine.dispose()
     log.info("scheduler stopped")
 

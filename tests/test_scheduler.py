@@ -4,11 +4,15 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import httpx
 import pytest
+import respx
+from respx.models import Call
 from sqlalchemy import Engine, select
 
 from cbb_digest import db, liveness
 from cbb_digest.clock import Clock
+from cbb_digest.heartbeat import Heartbeat
 from cbb_digest.runs import SENT_STATUSES, FinalStatus, finish_run, start_run
 from cbb_digest.scheduler import MAX_SLEEP, Scheduler, next_send_time
 from cbb_digest.schema import runs
@@ -139,6 +143,7 @@ def _scheduler(
     *,
     run_week: FakeRun | None = None,
     dry_run: bool = False,
+    heartbeat: Heartbeat | None = None,
     stop: threading.Event | None = None,
 ) -> Scheduler:
     return Scheduler(
@@ -147,6 +152,7 @@ def _scheduler(
         season=SEASON,
         run_week=run_week or FakeRun(clock, engine),
         dry_run=dry_run,
+        heartbeat=heartbeat,
         stop=stop,
     )
 
@@ -409,3 +415,91 @@ def test_a_dry_run_serve_does_not_repeat_a_week_it_dry_ran(engine: Engine) -> No
     _scheduler(clock, engine, run_week=fake_run, dry_run=True).cycle()
 
     assert fake_run.calls == []
+
+
+# --- healthchecks: the outcomes `run` cannot ping itself ---
+
+HC_URL = "https://hc-ping.com/abc-123"
+
+
+@pytest.fixture
+def pings() -> Iterator[tuple[Heartbeat, dict[str, respx.Route]]]:
+    with respx.mock(assert_all_called=False) as router, httpx.Client() as client:
+        yield (
+            Heartbeat(HC_URL, client),
+            {
+                "ok": router.post(HC_URL).respond(200),
+                "fail": router.post(f"{HC_URL}/fail").respond(200),
+            },
+        )
+
+
+def _pinged(route: respx.Route) -> list[str]:
+    # `CallList` is an untyped `list`; its elements are `Call`s.
+    calls: list[Call] = list(route.calls)
+    return [call.request.content.decode() for call in calls]
+
+
+def test_a_missed_week_pings_success_once(
+    engine: Engine, pings: tuple[Heartbeat, dict[str, respx.Route]]
+) -> None:
+    heartbeat, routes = pings
+    clock = FakeClock(et(2026, 11, 17, 13))
+    scheduler = _scheduler(clock, engine, heartbeat=heartbeat)
+
+    scheduler.cycle()
+    clock.advance(timedelta(hours=1))
+    scheduler.cycle()
+
+    assert _status(engine) == "skipped_missed"
+    assert _pinged(routes["ok"]) == [f"skipped_missed {RUN_ID} -"]
+    assert not routes["fail"].called
+
+
+def test_a_run_stopped_before_its_row_opened_pings_fail_with_the_reason(
+    engine: Engine, pings: tuple[Heartbeat, dict[str, respx.Route]]
+) -> None:
+    heartbeat, routes = pings
+    clock = FakeClock(et(2026, 11, 16, 9))
+    fake_run = FakeRun(clock, engine, error=RuntimeError("no transport is configured"))
+
+    _scheduler(clock, engine, run_week=fake_run, heartbeat=heartbeat).cycle()
+
+    assert _status(engine) == "failed"
+    assert _pinged(routes["fail"]) == [
+        f"failed {RUN_ID} -: RuntimeError: no transport is configured"
+    ]
+    assert not routes["ok"].called
+
+
+def test_a_failed_run_that_recorded_itself_is_not_pinged_again(
+    engine: Engine, pings: tuple[Heartbeat, dict[str, respx.Route]]
+) -> None:
+    # `run` pings its own failure once its row is open; the scheduler must not add a second.
+    heartbeat, routes = pings
+    clock = FakeClock(et(2026, 11, 16, 9))
+
+    class RecordsThenRaises(FakeRun):
+        def __call__(self, monday: date) -> None:
+            _record(engine, "failed", at=et(2026, 11, 16, 8))
+            raise RuntimeError("boom")
+
+    _scheduler(
+        clock, engine, run_week=RecordsThenRaises(clock, engine), heartbeat=heartbeat
+    ).cycle()
+
+    assert not routes["fail"].called
+    assert not routes["ok"].called
+
+
+def test_a_week_that_ran_is_left_to_run_to_ping(
+    engine: Engine, pings: tuple[Heartbeat, dict[str, respx.Route]]
+) -> None:
+    heartbeat, routes = pings
+    clock = FakeClock(et(2026, 11, 16, 9))
+
+    _scheduler(clock, engine, heartbeat=heartbeat).cycle()
+
+    assert _status(engine) == "sent"
+    assert not routes["ok"].called
+    assert not routes["fail"].called
