@@ -64,6 +64,9 @@ def _snapshot(
     connection.execute(
         delete(team_ratings_snapshot).where(team_ratings_snapshot.c.run_id == run_id)
     )
+    if not order:
+        # CBBD rates nobody before the season's first games: the snapshot is empty (§6).
+        return run_id
     connection.execute(
         insert(team_ratings_snapshot),
         [
@@ -217,16 +220,26 @@ def test_the_previous_week_is_found_across_new_year(engine: Engine) -> None:
     assert section.rows == [_row("t08", 4, 8, "moved"), _row("t04", 8, 4, "moved")]
 
 
-def test_a_run_without_a_snapshot_is_refused(engine: Engine) -> None:
+def test_an_empty_snapshot_before_the_first_games_is_the_baseline(engine: Engine) -> None:
+    # Opening week: CBBD has rated nobody yet, and every team is unranked (§6, §8.2).
     with engine.begin() as connection:
-        _snapshot(connection, WEEK_1, SLUGS)
-        run_id = _snapshot(connection, WEEK_2, SLUGS)
-        connection.execute(
-            delete(team_ratings_snapshot).where(team_ratings_snapshot.c.run_id == run_id)
-        )
+        run_id = _snapshot(connection, WEEK_1, [])
 
-        with pytest.raises(LookupError):
-            movers(connection, run_id, SEASON)
+        assert movers(connection, run_id, SEASON) == MoversSection(baseline=True)
+
+
+def test_the_first_week_with_ratings_after_an_empty_one_is_the_baseline(engine: Engine) -> None:
+    # An empty snapshot is nothing to compare with, so movers start the week after ratings do.
+    with engine.begin() as connection:
+        _snapshot(connection, WEEK_1, [])
+        run_id = _snapshot(connection, WEEK_2, SLUGS)
+
+        assert movers(connection, run_id, SEASON) == MoversSection(baseline=True)
+
+
+def test_an_unknown_run_is_refused(engine: Engine) -> None:
+    with engine.begin() as connection, pytest.raises(LookupError):
+        movers(connection, "2027-W99", SEASON)
 
 
 def test_a_season_that_is_not_the_runs_is_refused(engine: Engine) -> None:

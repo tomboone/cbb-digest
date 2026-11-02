@@ -293,6 +293,32 @@ def test_a_failed_source_sends_degraded(sources: respx.MockRouter, env: Path) ->
     assert "cbbd ratings" not in row["row_counts"]
 
 
+def test_ratings_cbbd_has_not_published_yet_leave_every_team_unranked(
+    sources: respx.MockRouter, env: Path
+) -> None:
+    # CBBD answers `[]` until the season's first games (§6): a valid week, not a failed source.
+    sources.get(f"{cbbd.BASE_URL}{cbbd.RATINGS_PATH}").respond(200, json=[])
+
+    code, output = _invoke("run", "--week", WEEK, "--dry-run")
+
+    assert code == 0, output
+    assert "status: sent" in output
+    row = _row(env)
+    assert row["status"] == "sent"
+    assert row["failed_sources"] == []
+    assert row["row_counts"]["cbbd ratings"] == 0
+    digest = json.loads((env / "out" / "digest.json").read_text(encoding="utf-8"))
+    assert digest["banner"] == []
+    assert digest["freshmen"]["rows"] == []
+    assert digest["movers"]["baseline"] is True
+    games = digest["featured"]["rows"]
+    assert games
+    assert all(game[side]["rank"] is None for game in games for side in ("home", "away"))
+    text = (env / "out" / "digest.txt").read_text(encoding="utf-8")
+    assert "No freshmen qualify yet." in text
+    assert "Baseline snapshot taken — movers start next week." in text
+
+
 @pytest.mark.usefixtures("mail")
 def test_a_send_that_fails_everywhere_records_a_failed_run(
     sources: respx.MockRouter, env: Path

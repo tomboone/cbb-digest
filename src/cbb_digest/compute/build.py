@@ -94,8 +94,8 @@ def build_digest(
 
     `failed` names the sources this run lacks. Run it inside the run's transaction: the
     watchlist section stores each player's inactive state as it goes. Raises `LookupError` when
-    the run, or a section's ratings snapshot, has not been loaded; `ValueError` when the run is
-    in another season; `ResolveError` when `teams` is empty.
+    the run has not been loaded; `ValueError` when the run is in another season; `ResolveError`
+    when `teams` is empty.
     """
     run_id = run_id_for(monday, watchlist.season)
     last_day = _last_day(connection, run_id, watchlist.season)
