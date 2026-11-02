@@ -64,7 +64,7 @@ Plain responsive HTML (MJML) with a text part. Readable on a phone in under five
 
 **TS%** = PTS / (2 × (FGA + 0.44 × FTA)) over the games in the window. It shows `—` when FGA + FTA = 0.
 
-**Formatting:** per-game stats to one decimal; percentages as whole numbers (`TS 58%`); times as `7:00 PM ET`; ranks as `#12`. Every team and player name links to its Torvik page. Names are URL-encoded (`p=Bennett%20Stirtz`). The link forms, all confirmed by clicking them in a browser on 2026-11-01:
+**Formatting:** per-game stats to one decimal; percentages as whole numbers (`TS 58%`); times as `7:00 PM ET`; ranks as `#12`. Every team and player name in sections 1–4 links to its Torvik page, with two exceptions. A team the crosswalk does not know, such as a non-D-I opponent, is shown under ESPN's name without a link (§7.5). The watchlist alerts (section 5) name each entry as written in `watchlist.yaml`, without a link: an alert carries no Torvik id or team, and an unresolved or ambiguous entry has no page to link to. Names are URL-encoded (`p=Bennett%20Stirtz`). The link forms, all confirmed by clicking them in a browser on 2026-11-01:
 
 | Link | URL |
 |---|---|
