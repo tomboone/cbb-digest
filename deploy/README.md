@@ -79,8 +79,8 @@ grep '^DRY_RUN=' .env              # DRY_RUN=true
 ```
 
 `RECIPIENTS` already defaults to `tom@tomboone.com`. Every other variable stays blank for now: the
-Resend credentials and the healthchecks.io URL are set when the digest goes live. Every variable and
-its default is documented in `.env.example`.
+Resend credentials are set for the first real send (step 6), and the healthchecks.io URL when the
+digest goes live. Every variable and its default is documented in `.env.example`.
 
 With `DRY_RUN=true`, a run renders the digest to `data/out/` and writes it to
 `data/outbox/<run id>.html` instead of emailing it. A dry run never blocks the real send of the
@@ -107,6 +107,112 @@ docker compose logs cbb-digest | grep '"next send"' | tail -1
 
 prints a line whose `send_at` is the coming Monday at `07:00:00-05:00` (`-04:00` while daylight
 saving time is in effect).
+
+## 6. First real send
+
+This sends one real digest for the current week to `RECIPIENTS`, by hand, and checks it arrives and
+reads well. It leaves `DRY_RUN=true` in `.env`, so nothing is sent on a schedule until the digest
+goes live.
+
+The run is for the Monday of the week containing today, in Eastern time, and that Monday must be
+in season: a Division I game last week or this week. Out of season the run prints
+`out of season: nothing to send`, ends with `status: skipped_offseason` and sends nothing; run it
+again once the season has started.
+
+**1. Set the Resend credentials.** The API key is the one nba-today already uses; it is in
+nba-today's `.env`. `tomboone.com` is already a verified domain in Resend, for mlb-today and
+nba-today, so `cbb@tomboone.com` can send without any DNS change. Paste the key at the
+`Resend API key:` prompt and press Enter:
+
+```sh
+printf 'Resend API key: ' && read -rs RESEND_API_KEY && echo
+sed -i '/^RESEND_API_KEY=/d' .env && printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY" >>.env
+unset RESEND_API_KEY
+sed -i '/^RESEND_FROM=/d' .env && echo 'RESEND_FROM=CBB Digest <cbb@tomboone.com>' >>.env
+sed -i '/^RECIPIENTS=/d' .env && echo 'RECIPIENTS=tom@tomboone.com' >>.env
+sed -i '/^#\? *DRY_RUN=/d' .env && echo 'DRY_RUN=true' >>.env
+```
+
+Check all four took:
+
+```sh
+grep -c '^RESEND_API_KEY=re_..*' .env   # 1
+grep '^RESEND_FROM=' .env               # RESEND_FROM=CBB Digest <cbb@tomboone.com>
+grep '^RECIPIENTS=' .env                # RECIPIENTS=tom@tomboone.com
+grep '^DRY_RUN=' .env                   # DRY_RUN=true
+```
+
+**2. Restart** so the container picks up the new `.env`:
+
+```sh
+docker compose up -d
+docker compose ps
+```
+
+`cbb-digest` shows `healthy` again within a minute.
+
+**3. Dry run.** It fetches every source, builds the digest and writes it to `data/out/` and
+`data/outbox/`, emailing nobody:
+
+```sh
+docker compose exec cbb-digest cbb-digest run --dry-run
+```
+
+It prints `week of <Monday>, run <run id>`, for example `run 2027-W45`, and ends with
+`status: sent`. `status: sent_degraded` means a source failed: the top of the digest names it, and
+its sections are missing. Don't go on to step 4 then; run the dry run again later, until it ends
+with `status: sent`.
+
+Copy the digest to your Mac and open it in a browser. The file is readable only by the container's
+user, so it is read through the container. Run this on the Mac, not on kumadrome:
+
+```sh
+ssh kumadrome 'cd ~/cbb-digest/deploy && docker compose exec -T cbb-digest cat /data/out/digest.html' >~/Downloads/cbb-digest.html
+open ~/Downloads/cbb-digest.html
+```
+
+Check every section is there and its links open Torvik pages. A dry run does not count as a send
+(spec §9.2), so it does not block step 4.
+
+**4. Real send.** Back on kumadrome, run the same week with `DRY_RUN` overridden for this one
+command; `.env` keeps `DRY_RUN=true`:
+
+```sh
+docker compose exec -e DRY_RUN=false cbb-digest cbb-digest run
+```
+
+It prints the same `week of <Monday>, run <run id>` line as step 3 and ends with `status: sent`.
+The command deliberately leaves out `--force`, so running it a second time for the same week exits 1
+with `run <run id> has already been sent; pass --force to send it again` rather than emailing the
+week again.
+
+If a source failed between steps 3 and 4, the run ends with `status: sent_degraded`: the email still
+went out, with the failed source named at its top. Check it in step 6 anyway. Once a dry run ends
+with `status: sent` again, send the full digest for the week a second time:
+
+```sh
+docker compose exec -e DRY_RUN=false cbb-digest cbb-digest run --force
+```
+
+**5. Check the run was recorded:**
+
+```sh
+docker compose exec cbb-digest python -c 'import sqlite3; print(sqlite3.connect("/data/cbb-digest.sqlite3").execute("select run_id, status, transport, sent_at from runs order by started_at desc limit 1").fetchone())'
+```
+
+It prints the run id from step 4, then `'sent'`, `'resend'` and the time the email went out, in
+UTC.
+
+**6. Check the email.** It arrives at `tom@tomboone.com` from `CBB Digest <cbb@tomboone.com>`, with
+the subject `CBB digest — week of <Mon D>`, for example `CBB digest — week of Nov 2`. Check that:
+
+- it is in the inbox, not in spam;
+- it reads correctly in Fastmail on the web: sections in order, tables not overflowing, links
+  opening Torvik pages;
+- it reads correctly in the Fastmail app on your phone, with no sideways scrolling.
+
+File each rendering problem as a bug ticket against the templates. Turning on the weekly send is the
+go-live step, not this one.
 
 ## Day-to-day
 
