@@ -1,0 +1,99 @@
+{#- The digest's plain-text alternative: the same sections as `digest.mjml.j2`, in the same order. -#}
+CBB Digest — week of {{ digest.week_of | long_date }}
+{% for line in digest.banner %}
+
+! {{ line }}
+{% endfor %}
+{% if digest.featured is not none %}
+{% set featured = digest.featured %}
+
+
+FEATURED GAMES ({{ this_week }}, tip times Eastern)
+{% for game in featured.rows %}
+
+{{ game.start | game_day }} · {{ game.start | tip }} · {{ game.networks }}
+{% for team in (game.away, game.home) %}
+  {{ "at " if loop.last else "" }}{{ ((team.rank | rank) ~ " " ~ (team.display_name or "TBD")) | trim }}
+{% endfor %}
+  Watchlist: {% for p in game.players %}{{ p.tier | tier_label }} {{ p.name }}{% if not loop.last %} · {% endif %}{% endfor %}
+
+{% else %}
+
+No games involving your watchlist this week.
+{% endfor %}
+{% if featured.more_count %}
+
++{{ featured.more_count }} more games involving your watchlist
+{% endif %}
+{% endif %}
+{% if digest.watchlist is not none %}
+{% set week = digest.watchlist %}
+
+
+WATCHLIST LAST WEEK ({{ last_week }}, per game)
+{% for row in week.rows %}
+
+{{ row.tier | tier_label }} {{ row.name }} ({{ row.team_name }}), {{ row.games }} G
+    {{ row.minutes_per_game | one }} MIN · {{ row.points_per_game | one }} PTS · {{ row.rebounds_per_game | one }} REB · {{ row.assists_per_game | one }} AST · TS {{ row.true_shooting | percent }} · {{ row.threes_attempted_per_game | one }} 3PA
+{% if row.notable %}
+    {{ row.notable }}
+{% endif %}
+{% else %}
+
+No watchlist player's team played last week.
+{% endfor %}
+{% if week.more_count %}
+
++{{ week.more_count }} more: {{ players_url }}
+{% endif %}
+{% endif %}
+{% if digest.freshmen is not none %}
+
+
+FRESHMEN TO WATCH (most minutes on top-100 teams · season, per game)
+{% for row in digest.freshmen.rows %}
+
+{{ row.name }} ({{ row.team_name }} {{ row.team_rank | rank }}), {{ row.games }} G
+    {{ row.minutes_per_game | one }} MIN · {{ row.points_per_game | one }} PTS · {{ row.rebounds_per_game | one }} REB · {{ row.assists_per_game | one }} AST · TS {{ row.true_shooting | percent }}
+{% else %}
+
+No freshmen qualify yet.
+{% endfor %}
+{% endif %}
+{% if digest.movers is not none %}
+{% set moved = digest.movers %}
+
+
+TOP-25 MOVERS (CBBD adjusted net rating, change since last week)
+
+{% if moved.baseline %}
+{{ baseline_line }}
+{% else %}
+{% for row in moved.rows %}
+{{ "%-4s" | format(row.rank | rank) }} {{ row.display_name }}: {{ row | change }}
+{% else %}
+No top-25 team moved three or more places.
+{% endfor %}
+{% if moved.more_count %}
+
++{{ moved.more_count }} more: {{ movers_more_label }}
+{{ ratings_url }}
+{% endif %}
+{% endif %}
+{% endif %}
+{% if digest.alerts %}
+
+
+WATCHLIST ALERTS
+
+{% for a in digest.alerts %}
+{{ a.kind | alert_label }}: {{ a.name }} ({{ a.detail }})
+{% endfor %}
+{% endif %}
+{% set footer = digest.footer %}
+
+
+--
+Run {{ footer.run_ts_et | stamp }} · data through {{ footer.data_as_of | long_date }} · run {{ footer.run_id }} · image {{ footer.image_sha | short_sha }}
+Watchlist: {{ footer.watchlist_url }}
+Data: Torvik, CBBD, ESPN. Ranks are CBBD's adjusted net rating.

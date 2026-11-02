@@ -1,0 +1,59 @@
+CBB Digest — week of Nov 2, 2026
+
+
+FEATURED GAMES (Nov 2 – Nov 8, tip times Eastern)
+
+Tue Nov 3 · 8:00 PM ET · BTN
+  #203 Lipscomb
+  at #21 Iowa
+  Watchlist: T1 Bennett Stirtz
+
+Tue Nov 3 · 6:00 PM ET · SEC Network
+  #242 Wofford
+  at #14 Tennessee
+  Watchlist: T1 Nate Ament
+
+Tue Nov 3 · 7:00 PM ET · SECN+
+  #330 Manhattan
+  at #29 Kentucky
+  Watchlist: T2 Otega Oweh
+
+
+WATCHLIST LAST WEEK (Oct 26 – Nov 1, per game)
+
+No watchlist player's team played last week.
+
+
+FRESHMEN TO WATCH (most minutes on top-100 teams · season, per game)
+
+Acaden Lewis (Villanova #39), 33 G
+    30.5 MIN · 12.2 PTS · 3.0 REB · 5.3 AST · TS 52%
+
+Dame Sarr (Duke #2), 38 G
+    23.5 MIN · 6.4 PTS · 3.8 REB · 1.1 AST · TS 52%
+
+Cayden Boozer (Duke #2), 38 G
+    22.8 MIN · 7.7 PTS · 2.3 REB · 3.0 AST · TS 60%
+
+Malachi Moreno (Kentucky #29), 36 G
+    22.6 MIN · 7.8 PTS · 6.3 REB · 1.8 AST · TS 64%
+
+Nikolas Khamenia (Duke #2), 38 G
+    19.8 MIN · 5.7 PTS · 3.3 REB · 1.0 AST · TS 57%
+
+
+TOP-25 MOVERS (CBBD adjusted net rating, change since last week)
+
+Baseline snapshot taken — movers start next week.
+
+
+WATCHLIST ALERTS
+
+Team changed: Otega Oweh (was Duke, now Kentucky)
+Unresolved: Nobody Real (not in Torvik's file)
+
+
+--
+Run Nov 2, 7:00 AM ET · data through Nov 1, 2026 · run 2026-W45 · image 0123456
+Watchlist: https://github.com/tomboone/cbb-digest/blob/0123456789abcdef0123456789abcdef01234567/watchlist.yaml
+Data: Torvik, CBBD, ESPN. Ranks are CBBD's adjusted net rating.

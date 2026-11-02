@@ -176,7 +176,18 @@
       ]),
     }),
     'run_id': '2026-W45',
+    'season': 2026,
     'subject': 'CBB digest — week of Nov 2',
+    'torvik_teams': dict({
+      'duke': 'Duke',
+      'iowa': 'Iowa',
+      'kentucky': 'Kentucky',
+      'lipscomb': 'Lipscomb',
+      'manhattan': 'Manhattan',
+      'tennessee': 'Tennessee',
+      'villanova': 'Villanova',
+      'wofford': 'Wofford',
+    }),
     'watchlist': dict({
       'alerts': list([
       ]),

@@ -22,11 +22,18 @@ from sqlalchemy import Connection, select
 from cbb_digest.collect import Sources
 from cbb_digest.compute.freshmen import freshmen_to_watch
 from cbb_digest.compute.games import featured_games
-from cbb_digest.compute.models import Digest, Footer
+from cbb_digest.compute.models import (
+    Digest,
+    FeaturedGamesSection,
+    Footer,
+    FreshmenSection,
+    MoversSection,
+    WatchlistWeekSection,
+)
 from cbb_digest.compute.movers import movers
 from cbb_digest.compute.watchlist_week import watchlist_last_week
 from cbb_digest.resolve import raised_alerts
-from cbb_digest.schema import runs
+from cbb_digest.schema import runs, teams
 from cbb_digest.sources.fetched import SourceFailure
 from cbb_digest.watchlist import Watchlist
 from cbb_digest.weeks import EASTERN, run_id_for
@@ -103,8 +110,10 @@ def build_digest(
 
     return Digest(
         run_id=run_id,
+        season=watchlist.season,
         subject=subject_for(monday),
         week_of=monday,
+        torvik_teams=_torvik_teams(connection, featured, week, freshmen, moved),
         banner=[line for source, line in BANNER.items() if source in failed],
         featured=featured,
         # Its `inactive` alerts move to `alerts`, so the digest holds each alert once.
@@ -123,6 +132,28 @@ def build_digest(
             watchlist_url=watchlist_url(image_sha),
         ),
     )
+
+
+def _torvik_teams(
+    connection: Connection,
+    featured: FeaturedGamesSection | None,
+    week: WatchlistWeekSection | None,
+    freshmen: FreshmenSection | None,
+    moved: MoversSection | None,
+) -> dict[str, str]:
+    """Slug → Torvik name for every team the sections name, sorted by slug."""
+    slugs: set[str] = set()
+    for game in featured.rows if featured is not None else []:
+        slugs.update(team.slug for team in (game.home, game.away) if team.slug is not None)
+        slugs.update(player.team_slug for player in game.players)
+    if week is not None:
+        slugs.update(row.team_slug for row in week.rows)
+    if freshmen is not None:
+        slugs.update(row.team_slug for row in freshmen.rows)
+    if moved is not None:
+        slugs.update(row.slug for row in moved.rows)
+    query = select(teams.c.slug, teams.c.torvik_name).where(teams.c.slug.in_(slugs))
+    return dict(sorted((slug, name) for slug, name in connection.execute(query)))
 
 
 def _last_day(connection: Connection, run_id: str, season: int) -> date:

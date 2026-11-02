@@ -1,0 +1,19 @@
+CBB Digest — week of Nov 2, 2026
+
+! ESPN schedule unavailable this week — featured games omitted.
+
+! Torvik stats unavailable this week — watchlist and freshmen omitted; player matches are from the last successful run.
+
+! CBBD ratings unavailable this week — movers and freshmen omitted; teams shown unranked.
+
+
+WATCHLIST ALERTS
+
+Team changed: Otega Oweh (was Duke, now Kentucky)
+Unresolved: Nobody Real (not in Torvik's file)
+
+
+--
+Run Nov 2, 7:00 AM ET · data through Nov 1, 2026 · run 2026-W45 · image 0123456
+Watchlist: https://github.com/tomboone/cbb-digest/blob/0123456789abcdef0123456789abcdef01234567/watchlist.yaml
+Data: Torvik, CBBD, ESPN. Ranks are CBBD's adjusted net rating.
