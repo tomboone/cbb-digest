@@ -62,7 +62,8 @@ def _json(path: str) -> httpx.Response:
     return httpx.Response(200, content=body, headers={"Content-Type": "application/json"})
 
 
-def _scoreboard(request: httpx.Request) -> httpx.Response:
+def scoreboard(request: httpx.Request) -> httpx.Response:
+    """The fixture week's ESPN days: the 2026-11-03 slate, and no games on the rest."""
     if request.url.params["dates"] == "20261103":
         return _json("espn/scoreboard-2026-11-01.json")
     return httpx.Response(200, json={"events": []})
@@ -85,7 +86,7 @@ def sources() -> Iterator[respx.MockRouter]:
         router.get(f"{cbbd.BASE_URL}{cbbd.RATINGS_PATH}").mock(
             return_value=_json("cbbd/ratings-adjusted-y2026-2026-11-01.json")
         )
-        router.get(f"{espn.BASE_URL}{espn.SCOREBOARD_PATH}").mock(side_effect=_scoreboard)
+        router.get(f"{espn.BASE_URL}{espn.SCOREBOARD_PATH}").mock(side_effect=scoreboard)
         yield router
 
 

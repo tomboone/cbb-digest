@@ -21,13 +21,14 @@ from sqlalchemy.exc import OperationalError
 
 from cbb_digest import db, liveness
 from cbb_digest.atomic import write_atomic
-from cbb_digest.clock import SystemClock
+from cbb_digest.clock import Clock, SystemClock
 from cbb_digest.collect import (
     RequestCounter,
     Sources,
     cache_only_clients,
     collect,
     live_clients,
+    refetch_failed,
     teams_cached,
 )
 from cbb_digest.compute.build import Source, build_digest, failed_sources
@@ -77,6 +78,12 @@ DryRunOption = Annotated[
 ForceOption = Annotated[
     bool, typer.Option("--force", help="Send even if this run id has already been sent.")
 ]
+NoRetryOption = Annotated[
+    bool,
+    typer.Option(
+        "--no-retry", help="Degrade at once instead of retrying failed sources after 30 minutes."
+    ),
+]
 WeekOption = Annotated[
     datetime | None,
     typer.Option("--week", formats=["%Y-%m-%d"], help="Any date in the week to run."),
@@ -87,6 +94,9 @@ OUT_DIRNAME = "out"
 DIGEST_JSON = "digest.json"
 DIGEST_HTML = "digest.html"
 DIGEST_TEXT = "digest.txt"
+
+# How long `run` waits before refetching the sources that failed, once (spec §9.3).
+RETRY_DELAY = timedelta(minutes=30)
 
 
 def _bootstrap() -> Settings:
@@ -169,6 +179,36 @@ def _echo_fetched(sources: Sources, requests: int) -> None:
     for label, result in sources.outcomes():
         typer.echo(_outcome(label, result))
     typer.echo(f"requests: {requests}")
+
+
+def _fetch_with_retry(
+    settings: Settings, engine: Engine, season: int, monday: date, *, clock: Clock, retry: bool
+) -> Sources:
+    """The week's sources, as `fetch` gets them. When any fails and `retry` is set, wait
+    `RETRY_DELAY` on `clock`, then refetch only the failed ones, once (spec §9.3). Whatever
+    still fails is left for the run to degrade around: never last week's data in its place."""
+    sources, requests = _fetch_sources(settings, engine, season, monday, refresh_teams=False)
+    _echo_fetched(sources, requests)
+    failed = [label for label, result in sources.outcomes() if isinstance(result, SourceFailure)]
+    if not failed or not retry:
+        return sources
+
+    retry_at = clock.now() + RETRY_DELAY
+    log.warning(
+        "sources failed; retrying once", extra={"sources": failed, "retry_at": retry_at.isoformat()}
+    )
+    typer.echo(f"retrying {', '.join(failed)} at {retry_at.astimezone(EASTERN):%H:%M} ET")
+    clock.sleep_until(retry_at)
+    counter = RequestCounter()
+    clients = live_clients(settings.cbbd_api_key, counter)
+    try:
+        sources = refetch_failed(
+            clients, _cache(settings), sources, season=season, this_week_start=monday
+        )
+    finally:
+        clients.close()
+    _echo_fetched(sources, counter.count)
+    return sources
 
 
 def _load_week(
@@ -558,9 +598,12 @@ def run(
     week: WeekOption = None,
     force: ForceOption = False,
     dry_run: DryRunOption = False,
+    no_retry: NoRetryOption = False,
 ) -> None:
     """Fetch, load, resolve, compute, render and send one week, recording it in `runs`.
 
+    A source that fails is refetched once, 30 minutes later; one still failing then omits its
+    sections and the run ends `sent_degraded`. `--no-retry` degrades at once, for manual runs.
     An out-of-season week stops after `resolve` as `skipped_offseason`, sending nothing. A week
     that has already gone out by email is refused, exiting 1, unless `--force`. `--dry-run` (or
     `DRY_RUN=true`) sends to the outbox under `DATA_DIR` instead of by email; it is never refused,
@@ -589,7 +632,16 @@ def run(
         typer.echo(f"week of {monday.isoformat()}, run {run_id}")
         record = _RunRecord()
         try:
-            status = _run_week(settings, engine, wl, monday, transport, record)
+            status = _run_week(
+                settings,
+                engine,
+                wl,
+                monday,
+                transport,
+                record,
+                clock=SystemClock(),
+                retry=not no_retry,
+            )
         except Exception:
             # §9.3: anything that stops the run records it as failed. `sent_at` survives, so a
             # crash after the email went out still refuses a second send.
@@ -618,16 +670,19 @@ def _run_week(
     monday: date,
     transport: Transport,
     record: _RunRecord,
+    *,
+    clock: Clock,
+    retry: bool,
 ) -> FinalStatus:
     """The steps of `run` after `start_run`, finishing the run's row; the status it ended with.
 
-    A failed source does not stop the run: its sections are omitted and the run ends
+    A failed source does not stop the run: unless `retry` is off it is refetched once, after
+    `RETRY_DELAY` on `clock`, and if it still fails its sections are omitted and the run ends
     `sent_degraded` (§9.3). With Torvik failed, resolution is skipped and the stored
     resolutions stand.
     """
     run_id = run_id_for(monday, wl.season)
-    sources, requests = _fetch_sources(settings, engine, wl.season, monday, refresh_teams=False)
-    _echo_fetched(sources, requests)
+    sources = _fetch_with_retry(settings, engine, wl.season, monday, clock=clock, retry=retry)
     failed = failed_sources(sources)
     record.failed_sources = sorted(failed)
     record.row_counts = {
@@ -682,8 +737,8 @@ def _run_week(
 
 def _run_scheduled(monday: date) -> None:
     """`run` for the week of `monday`, as `serve` dispatches it: never forced, and dry only when
-    `DRY_RUN` says so."""
-    run(week=datetime.combine(monday, time()), force=False, dry_run=False)
+    `DRY_RUN` says so; failed sources are retried."""
+    run(week=datetime.combine(monday, time()), force=False, dry_run=False, no_retry=False)
 
 
 @app.command()
