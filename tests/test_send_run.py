@@ -6,24 +6,30 @@ ESPN's Tuesday. Resend is the respx route the source fixtures share; SMTP is `te
 """
 
 import json
-from collections.abc import Iterator
+import threading
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 import respx
 from sqlalchemy import Engine, select
 from typer.testing import CliRunner
 
-from cbb_digest import db
-from cbb_digest.cli import app
+from cbb_digest import cli, db
+from cbb_digest.cli import RETRY_DELAY, app
+from cbb_digest.compute.build import BANNER
 from cbb_digest.schema import runs
-from cbb_digest.sources import cbbd
+from cbb_digest.sources import cbbd, espn, torvik
 from cbb_digest.transport import smtp
 from cbb_digest.transport.resend import API_URL
+from tests.fakes import FakeClock
 from tests.test_build import MONDAY, RUN_ID
 from tests.test_build import env as env
 from tests.test_build import week as week
+from tests.test_load import FIXTURES, scoreboard
 from tests.test_load import sources as sources
 from tests.test_smtp import FakeSMTP
 
@@ -31,6 +37,19 @@ WEEK = MONDAY.isoformat()
 SUBJECT = "CBB digest — week of Nov 2"
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def clock(monkeypatch: pytest.MonkeyPatch) -> FakeClock:
+    """One fake clock behind every `SystemClock()` the CLI builds, so a retry's 30-minute wait
+    returns at once and the cache sees the time it skipped."""
+    fake = FakeClock(datetime.now(UTC))
+
+    def system_clock(stop: threading.Event | None = None) -> FakeClock:
+        return fake
+
+    monkeypatch.setattr(cli, "SystemClock", system_clock)
+    return fake
 
 
 @pytest.fixture
@@ -291,6 +310,127 @@ def test_a_failed_source_sends_degraded(sources: respx.MockRouter, env: Path) ->
     assert (row["status"], row["transport"]) == ("sent_degraded", "resend")
     assert row["failed_sources"] == ["cbbd"]
     assert "cbbd ratings" not in row["row_counts"]
+
+
+def _down_until(
+    clock: FakeClock, until: datetime, up: Callable[[httpx.Request], httpx.Response]
+) -> Callable[[httpx.Request], httpx.Response]:
+    """A respx side effect: HTTP 503 before `until` on `clock`, then whatever `up` answers."""
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        if clock.now() < until:
+            return httpx.Response(503)
+        return up(request)
+
+    return answer
+
+
+def _routes(router: respx.MockRouter) -> dict[str, respx.Route]:
+    return {
+        "player season": router.get(f"{torvik.BASE_URL}{torvik.PLAYER_SEASON_PATH}"),
+        "game logs": router.get(f"{torvik.BASE_URL}{torvik.player_games_path(2026)}"),
+        "ratings": router.get(f"{cbbd.BASE_URL}{cbbd.RATINGS_PATH}"),
+        # Fetched too: the run starts with `teams` empty.
+        "teams": router.get(f"{cbbd.BASE_URL}{cbbd.TEAMS_PATH}"),
+    }
+
+
+def _digest(env: Path) -> dict[str, Any]:
+    return json.loads((env / "out" / "digest.json").read_text(encoding="utf-8"))
+
+
+def test_a_source_that_recovers_within_30_minutes_is_refetched_and_the_run_sends_complete(
+    sources: respx.MockRouter, env: Path, clock: FakeClock
+) -> None:
+    retry_at = clock.now() + RETRY_DELAY
+    sources.get(f"{espn.BASE_URL}{espn.SCOREBOARD_PATH}").mock(
+        side_effect=_down_until(clock, retry_at, scoreboard)
+    )
+
+    code, output = _invoke("run", "--week", WEEK, "--dry-run")
+
+    assert code == 0, output
+    assert "status: sent" in output
+    assert clock.sleeps == [retry_at]
+    row = _row(env)
+    assert row["status"] == "sent"
+    assert row["failed_sources"] == []
+    assert row["row_counts"]["espn week"] == 29
+    digest = _digest(env)
+    assert digest["banner"] == []
+    assert digest["featured"]["rows"]
+    # The sources that answered the first time are never asked again.
+    for name, route in _routes(sources).items():
+        assert route.call_count == 1, name
+
+
+def test_a_source_still_failing_after_the_retry_sends_degraded_without_its_sections(
+    sources: respx.MockRouter, env: Path, clock: FakeClock
+) -> None:
+    # Opening week is in season only by ESPN's games this week (§8.2), so with ESPN down the
+    # game logs need a game last week for the week to send at all.
+    logs = json.loads((FIXTURES / "torvik/all_advgames-y2026-2026-11-01.json").read_bytes())
+    logs[0][0] = "20261031"
+    sources.get(f"{torvik.BASE_URL}{torvik.player_games_path(2026)}").respond(200, json=logs)
+    retry_at = clock.now() + RETRY_DELAY
+    sources.get(f"{espn.BASE_URL}{espn.SCOREBOARD_PATH}").respond(503)
+
+    code, output = _invoke("run", "--week", WEEK, "--dry-run")
+
+    assert code == 0, output
+    assert "status: sent_degraded" in output
+    assert clock.sleeps == [retry_at]
+    row = _row(env)
+    assert row["status"] == "sent_degraded"
+    assert row["failed_sources"] == ["espn"]
+    assert "espn week" not in row["row_counts"]
+    digest = _digest(env)
+    assert digest["banner"] == [BANNER["espn"]]
+    assert digest["featured"] is None
+    for section in ("watchlist", "freshmen", "movers"):
+        assert digest[section] is not None, section
+    for name, route in _routes(sources).items():
+        assert route.call_count == 1, name
+
+
+def test_a_challenge_page_is_retried_once_then_degrades(
+    sources: respx.MockRouter, env: Path, clock: FakeClock
+) -> None:
+    # Torvik's browser check answers 200 text/html (§6): a failure, refetched once, never solved.
+    route = sources.get(f"{torvik.BASE_URL}{torvik.PLAYER_SEASON_PATH}").respond(
+        200,
+        content=(FIXTURES / "torvik/playerstat-challenge-2026-11-01.html").read_bytes(),
+        headers={"Content-Type": "text/html; charset=UTF-8"},
+    )
+
+    code, output = _invoke("run", "--week", WEEK, "--dry-run")
+
+    assert code == 0, output
+    assert len(clock.sleeps) == 1
+    assert route.call_count == 2
+    row = _row(env)
+    assert (row["status"], row["failed_sources"]) == ("sent_degraded", ["torvik"])
+
+
+def test_no_retry_degrades_at_once(sources: respx.MockRouter, env: Path, clock: FakeClock) -> None:
+    route = sources.get(f"{cbbd.BASE_URL}{cbbd.RATINGS_PATH}").respond(404)
+
+    code, output = _invoke("run", "--week", WEEK, "--dry-run", "--no-retry")
+
+    assert code == 0, output
+    assert clock.sleeps == []
+    assert route.call_count == 1
+    row = _row(env)
+    assert (row["status"], row["failed_sources"]) == ("sent_degraded", ["cbbd"])
+
+
+def test_a_run_whose_sources_all_answer_does_not_wait(
+    sources: respx.MockRouter, env: Path, clock: FakeClock
+) -> None:
+    code, output = _invoke("run", "--week", WEEK, "--dry-run")
+
+    assert code == 0, output
+    assert clock.sleeps == []
 
 
 def test_ratings_cbbd_has_not_published_yet_leave_every_team_unranked(

@@ -269,7 +269,7 @@ There is one package, `cbb_digest`, in the `src` layout. `typer` CLI `cbb-digest
 | `compute` | Build the typed `Digest` model (§8). |
 | `render [--dry-run]` | Digest → HTML + text. `--dry-run` writes `out/digest.html` and `out/digest.txt` (under `/data/out` in the container). |
 | `send [--force]` | Send through the transport chain. Refuses if the run id already has `sent_at`, unless `--force`. |
-| `run [--week YYYY-MM-DD] [--force] [--dry-run]` | All of the above for one week, plus the healthchecks ping. |
+| `run [--week YYYY-MM-DD] [--force] [--dry-run] [--no-retry]` | All of the above for one week, plus the healthchecks ping. `--no-retry` skips the 30-minute retry of failed sources (§9.3), for manual runs. |
 | `serve` | Long-running loop (§9.2). |
 | `reset --season N [--send]` | Portal-reset digest (§11). Without `--send`, it writes to `out/`. |
 | `health` | Container health check: exit 0 if the last `serve` heartbeat in SQLite is under 8 days old. |

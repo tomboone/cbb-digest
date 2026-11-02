@@ -127,13 +127,18 @@ def test_serve_dispatches_the_week_through_run(
     # Monday 2026-11-16 09:00 Eastern: inside the window, with the week unsent.
     monday = date(2026, 11, 16)
     now = datetime(2026, 11, 16, 14, tzinfo=UTC)
-    calls: list[tuple[datetime | None, bool, bool]] = []
+    calls: list[tuple[datetime | None, bool, bool, bool]] = []
 
     def fake_clock(stop: threading.Event | None = None) -> FakeClock:
         return FakeClock(now)
 
-    def fake_run(week: datetime | None = None, force: bool = False, dry_run: bool = False) -> None:
-        calls.append((week, force, dry_run))
+    def fake_run(
+        week: datetime | None = None,
+        force: bool = False,
+        dry_run: bool = False,
+        no_retry: bool = False,
+    ) -> None:
+        calls.append((week, force, dry_run, no_retry))
 
     def no_handler(signum: int, handler: object) -> None:
         return None
@@ -146,4 +151,5 @@ def test_serve_dispatches_the_week_through_run(
     result = runner.invoke(cli.app, ["serve"])
 
     assert result.exit_code == 0, result.output
-    assert calls == [(datetime.combine(monday, datetime.min.time()), False, False)]
+    # A scheduled run is never forced, and retries its failed sources (spec §9.3).
+    assert calls == [(datetime.combine(monday, datetime.min.time()), False, False, False)]

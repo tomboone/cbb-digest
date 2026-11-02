@@ -10,7 +10,7 @@ Per run that is the Torvik season file and game logs, CBBD's adjusted ratings, a
 scoreboard days: 10 requests. CBBD's teams add one more, only when asked for.
 """
 
-from collections.abc import Sized
+from collections.abc import Callable, Sized
 from dataclasses import dataclass
 from datetime import date
 
@@ -19,7 +19,7 @@ from pydantic import SecretStr
 
 from cbb_digest.sources import cbbd, espn, torvik
 from cbb_digest.sources.cache import ResponseCache
-from cbb_digest.sources.fetched import Fetched
+from cbb_digest.sources.fetched import Fetched, SourceFailure
 from cbb_digest.sources.models.cbbd_rating import CbbdRating
 from cbb_digest.sources.models.cbbd_team import CbbdTeam
 from cbb_digest.sources.models.espn_scoreboard import EspnGame
@@ -112,6 +112,48 @@ def collect(
         cbbd_teams=cbbd.fetch_teams(clients.cbbd, cache, season) if include_teams else None,
         espn_week=espn.fetch_week(clients.espn, cache, this_week_start),
     )
+
+
+def refetch_failed(
+    clients: Clients,
+    cache: ResponseCache,
+    sources: Sources,
+    *,
+    season: int,
+    this_week_start: date,
+) -> Sources:
+    """`sources` with every failed source fetched once more and the rest kept untouched, so a
+    source that answered is never asked twice (spec §9.3).
+
+    The refetch reaches the network: a failure always evicts its cache entry (`fetch_source`).
+    The only entries it reads are the ESPN days this run already fetched before a later day
+    failed.
+    """
+    return Sources(
+        player_season=_again(
+            sources.player_season,
+            lambda: torvik.fetch_player_season(clients.torvik, cache, season),
+        ),
+        player_games=_again(
+            sources.player_games,
+            lambda: torvik.fetch_player_games(clients.torvik, cache, season),
+        ),
+        ratings=_again(
+            sources.ratings, lambda: cbbd.fetch_adjusted_ratings(clients.cbbd, cache, season)
+        ),
+        cbbd_teams=(
+            None
+            if sources.cbbd_teams is None
+            else _again(sources.cbbd_teams, lambda: cbbd.fetch_teams(clients.cbbd, cache, season))
+        ),
+        espn_week=_again(
+            sources.espn_week, lambda: espn.fetch_week(clients.espn, cache, this_week_start)
+        ),
+    )
+
+
+def _again[T](result: Fetched[T], fetch: Callable[[], Fetched[T]]) -> Fetched[T]:
+    return fetch() if isinstance(result, SourceFailure) else result
 
 
 def teams_cached(cache: ResponseCache, season: int) -> bool:
