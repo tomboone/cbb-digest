@@ -23,14 +23,14 @@ MAX_ROWS = 10
 
 
 def movers(connection: Connection, run_id: str, season: int) -> MoversSection:
-    """The movers section for `run_id`, whose snapshot must already be loaded.
+    """The movers section for `run_id`, read after its snapshot is loaded.
 
     The caller omits the section when this run's CBBD fetch failed (§9.3): a snapshot left by an
-    earlier attempt at the same run id would otherwise stand in for this week's ratings.
+    earlier attempt at the same run id would otherwise stand in for this week's ratings. An empty
+    snapshot is CBBD before the season's first games (§6); with no earlier snapshot to compare,
+    it is the baseline, as on opening week (§8.2).
     """
     current = _snapshot(connection, run_id)
-    if not current:
-        raise LookupError(f"no ratings snapshot for run {run_id!r}")
     previous_run_id = _previous_run_id(connection, run_id, season)
     if previous_run_id is None:
         return MoversSection(baseline=True)

@@ -23,19 +23,14 @@ MAX_ROWS = 5
 
 
 def freshmen_to_watch(connection: Connection, run_id: str, watchlist: Watchlist) -> FreshmenSection:
-    """The freshmen-to-watch section for `run_id`, whose snapshot must already be loaded.
+    """The freshmen-to-watch section for `run_id`, read after its snapshot is loaded.
 
-    The caller omits the section when this run's Torvik or CBBD fetch failed (§9.3).
+    The caller omits the section when this run's Torvik or CBBD fetch failed (§9.3). An empty
+    snapshot is CBBD before the season's first games: every team is unranked, so no freshman
+    qualifies (§6).
     """
     season = watchlist.season
     _check_run(connection, run_id, season)
-    has_snapshot = connection.execute(
-        select(team_ratings_snapshot.c.run_id)
-        .where(team_ratings_snapshot.c.run_id == run_id)
-        .limit(1)
-    ).first()
-    if has_snapshot is None:
-        raise LookupError(f"no ratings snapshot for run {run_id!r}")
     listed = {entry.torvik_pid for entry in resolved_players(connection, watchlist)}
 
     query = (

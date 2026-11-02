@@ -253,6 +253,8 @@ Compare this run's ratings snapshot top 25 with the previous run's snapshot in t
 
 Sort by |change| ↓, with entries and exits after the moves, by current rank. Cap at 10. A same-week forced re-run compares with the previous **week's** snapshot, not with itself.
 
+The previous snapshot is the latest earlier run's that holds ratings. An empty snapshot (CBBD before the season's first games, §6) is nothing to compare with. So a run with no earlier ratings shows the baseline line (§5): the opening-week digest while ratings are still empty, and again the first week they arrive.
+
 ## 9. Architecture
 
 ### 9.1 Flow and CLI

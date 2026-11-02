@@ -252,12 +252,15 @@ def test_true_shooting_is_none_without_attempts(engine: Engine) -> None:
     assert section.rows[0].true_shooting is None
 
 
-def test_a_run_with_no_snapshot_is_an_error(engine: Engine) -> None:
+def test_an_empty_snapshot_leaves_no_team_ranked_and_no_freshman_qualifying(
+    engine: Engine,
+) -> None:
+    # Before the season's first games CBBD rates nobody, so every team is unranked (§6).
     with engine.begin() as connection:
         world = _World(connection, snapshot=False)
         world.player()
-        with pytest.raises(LookupError):
-            world.section()
+        section = world.section()
+    assert section.rows == []
 
 
 def test_an_unknown_run_is_an_error(engine: Engine) -> None:
