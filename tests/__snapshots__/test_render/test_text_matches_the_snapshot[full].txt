@@ -1,0 +1,63 @@
+CBB Digest — week of Nov 16, 2026
+
+
+FEATURED GAMES (Nov 16 – Nov 22, tip times Eastern)
+
+Tue Nov 17 · 7:00 PM ET · ESPN/ESPN+
+  #12 Iowa
+  at #3 Duke
+  Watchlist: T1 Bennett Stirtz · T2 Cameron Boozer
+
+Sat Nov 21 · 12:00 PM ET · —
+  Small College
+  at #12 Iowa
+  Watchlist: T1 Bennett Stirtz
+
+Sun Nov 22 · 8:00 PM ET · BTN
+  #12 Iowa
+  at Iowa State
+  Watchlist: T1 Bennett Stirtz
+
++2 more games involving your watchlist
+
+
+WATCHLIST LAST WEEK (Nov 9 – Nov 15, per game)
+
+T1 Bennett Stirtz (Iowa), 2 G
+    34.5 MIN · 22.0 PTS · 4.5 REB · 6.2 AST · TS 61% · 7.0 3PA
+    Season high: 31 pts
+
+T2 Cameron Boozer (Duke), 0 G
+    0.0 MIN · 0.0 PTS · 0.0 REB · 0.0 AST · TS — · 0.0 3PA
+    DNP — 2nd straight week
+
++3 more: https://barttorvik.com/playerstat.php?link=y&year=2026
+
+
+FRESHMEN TO WATCH (most minutes on top-100 teams · season, per game)
+
+Zuby Ejiofor (St. John's #18), 4 G
+    30.2 MIN · 14.0 PTS · 8.8 REB · 1.5 AST · TS 58%
+
+
+TOP-25 MOVERS (CBBD adjusted net rating, change since last week)
+
+#12  Iowa: up 6 (was #18)
+#3   Duke: up 4 (was #7)
+#20  St. John's: entered (was #31)
+#29  Iowa State: left (was #22)
+
++1 more: full ratings table (Torvik's; ranks differ slightly)
+https://barttorvik.com/trank.php?year=2026
+
+
+WATCHLIST ALERTS
+
+Team changed: Otega Oweh (was Duke, now Kentucky)
+Inactive: Cameron Boozer (DNP 2 straight weeks)
+
+
+--
+Run Nov 16, 7:00 AM ET · data through Nov 15, 2026 · run 2026-W47 · image 0123456
+Watchlist: https://github.com/tomboone/cbb-digest/blob/0123456789abcdef0123456789abcdef01234567/watchlist.yaml
+Data: Torvik, CBBD, ESPN. Ranks are CBBD's adjusted net rating.

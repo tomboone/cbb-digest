@@ -25,9 +25,11 @@ from cbb_digest.collect import (
     teams_cached,
 )
 from cbb_digest.compute.build import build_digest, failed_sources
+from cbb_digest.compute.models import Digest
 from cbb_digest.load import TABLES, LoadError, LoadInput, TableReport, stored_cbbd_teams
 from cbb_digest.load import load as load_sources
 from cbb_digest.logging import configure_logging
+from cbb_digest.render.render import render as render_digest
 from cbb_digest.resolve import Entry, ResolveError
 from cbb_digest.resolve import resolve as resolve_watchlist
 from cbb_digest.scheduler import Scheduler
@@ -58,6 +60,8 @@ WeekOption = Annotated[
 CACHE_DIRNAME = "cache"
 OUT_DIRNAME = "out"
 DIGEST_JSON = "digest.json"
+DIGEST_HTML = "digest.html"
+DIGEST_TEXT = "digest.txt"
 
 
 def _bootstrap() -> Settings:
@@ -327,9 +331,43 @@ def compute(week: WeekOption = None) -> None:
 
 
 @app.command()
-def render(dry_run: DryRunOption = False) -> None:
-    """Render the digest to HTML and text."""
-    _not_implemented("render")
+def render(week: WeekOption = None, dry_run: DryRunOption = False) -> None:
+    """Render out/digest.json, which `compute` wrote, to out/digest.html and out/digest.txt.
+
+    `render` never sends, so `--dry-run` changes nothing here; it is accepted so the step reads
+    the same alone as inside `run --dry-run`. Exits 1 when the digest is missing, unreadable, or
+    for another week than `--week`, or when its MJML does not compile.
+    """
+    del dry_run
+    wl = _load_watchlist()
+    settings = _bootstrap()
+    out = settings.data_dir / OUT_DIRNAME
+    expected = run_id_for(_monday(week), wl.season)
+    try:
+        digest = Digest.model_validate_json((out / DIGEST_JSON).read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        typer.echo(f"no {out / DIGEST_JSON}: run `cbb-digest compute` first", err=True)
+        raise typer.Exit(1) from exc
+    except ValidationError as exc:
+        typer.echo(f"{out / DIGEST_JSON} is not a digest: run `cbb-digest compute` again", err=True)
+        raise typer.Exit(1) from exc
+    if digest.run_id != expected:
+        typer.echo(
+            f"{out / DIGEST_JSON} is run {digest.run_id}, not {expected}: "
+            "run `cbb-digest compute` for that week first",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    try:
+        rendered = render_digest(digest)
+    except ValueError as exc:
+        typer.echo(f"the digest's MJML did not compile: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    for name, body in ((DIGEST_HTML, rendered.html), (DIGEST_TEXT, rendered.text)):
+        write_atomic(out / name, body)
+        typer.echo(f"wrote {out / name}")
+    typer.echo(f"subject: {rendered.subject}")
 
 
 @app.command()

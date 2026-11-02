@@ -1,0 +1,190 @@
+{#- The digest email (spec §5), authored for a 600 px column and compiled by `mjml` (nba-today
+    ADR-0003), in nba-today's fonts, spacing and colours so the two read as siblings. Styles are
+    inline or attributes rather than an authored <mj-style> block, which several mail clients drop.
+    Table cells use `align` and the table's `cellpadding` rather than per-cell styles. Number cells
+    are `nowrap` and name cells wrap, so a phone wraps names, not numbers. No images, no pixels. -#}
+{% set ink = "#1a1a1a" %}
+{% set muted = "#666666" %}
+{% set rule = "#e5e5e5" %}
+{% set navy = "#17408b" %}
+{% set alert = "#c8102e" %}
+{% macro link(text, url) -%}
+{% if url %}<a href="{{ url }}" style="color:{{ navy }};text-decoration:none;">{{ text }}</a>{% else %}{{ text }}{% endif %}
+{%- endmacro %}
+{% macro th(label, align="right") -%}
+<th align="{{ align }}" nowrap="nowrap" style="color:{{ muted }};border-bottom:1px solid {{ rule }};">{{ label }}</th>
+{%- endmacro %}
+{% macro td(value, align="right") -%}
+<td align="{{ align }}" nowrap="nowrap">{{ value }}</td>
+{%- endmacro %}
+{% macro ranked(team) -%}
+{% set r = team.rank | rank %}
+{% if r %}<span style="color:{{ muted }};">{{ r }}</span> {% endif %}{{ link(team.display_name or "TBD", team_url(team.slug)) }}
+{%- endmacro %}
+{% macro heading(title, note=none) %}
+    <mj-section padding="24px 0 4px">
+      <mj-column>
+        <mj-text font-size="18px" font-weight="700" color="{{ navy }}">{{ title }}</mj-text>
+        {% if note %}
+        <mj-text font-size="12px" color="{{ muted }}">{{ note }}</mj-text>
+        {% endif %}
+      </mj-column>
+    </mj-section>
+{% endmacro %}
+{% macro empty(line) %}
+    <mj-section>
+      <mj-column>
+        <mj-text padding="6px 16px 0" color="{{ muted }}">{{ line }}</mj-text>
+      </mj-column>
+    </mj-section>
+{% endmacro %}
+<mjml>
+  <mj-head>
+    <mj-title>{{ subject }}</mj-title>
+    <mj-attributes>
+      <mj-all font-family="Helvetica, Arial, sans-serif" />
+      <mj-text font-size="14px" line-height="1.45" color="{{ ink }}" padding="0 16px" />
+      <mj-table font-size="12px" line-height="1.4" color="{{ ink }}" padding="0 16px" cellpadding="3" />
+      <mj-section padding="0" />
+      <mj-column padding="0" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body width="600px" background-color="#f4f4f4">
+    <mj-wrapper padding="0" background-color="#ffffff">
+
+    <mj-section background-color="{{ navy }}" padding="20px 0">
+      <mj-column>
+        <mj-text font-size="24px" font-weight="700" color="#ffffff">CBB Digest</mj-text>
+        <mj-text font-size="14px" color="#c9d3e8">Week of {{ digest.week_of | long_date }}</mj-text>
+      </mj-column>
+    </mj-section>
+
+    {% if digest.banner %}
+    <mj-section padding="16px 16px 0">
+      <mj-column background-color="#fff4e5" border-left="4px solid #f0a020" padding="8px 0">
+        {% for line in digest.banner %}
+        <mj-text font-size="13px">{{ line }}</mj-text>
+        {% endfor %}
+      </mj-column>
+    </mj-section>
+    {% endif %}
+
+    {% if digest.featured is not none %}
+    {% set featured = digest.featured %}
+    {{ heading("Featured games", this_week ~ " · tip times Eastern · your watchlist players by tier") }}
+    {% if featured.rows %}
+    <mj-section>
+      <mj-column>
+        {% for game in featured.rows %}
+        <mj-text font-size="12px" font-weight="700" color="{{ muted }}" padding="12px 16px 0">{{ game.start | game_day }} · {{ game.start | tip }} · {{ game.networks }}</mj-text>
+        <mj-text padding="2px 16px 0"><strong>{{ ranked(game.away) }} at {{ ranked(game.home) }}</strong></mj-text>
+        <mj-text font-size="12px" padding="2px 16px 0">
+          {% for p in game.players %}<span style="color:{{ muted }};">{{ p.tier | tier_label }}</span> {{ link(p.name, player_url(p.name, p.team_slug)) }}{% if not loop.last %} · {% endif %}{% endfor %}
+        </mj-text>
+        {% endfor %}
+        {% if featured.more_count %}
+        <mj-text font-size="12px" color="{{ muted }}" padding="10px 16px 0">+{{ featured.more_count }} more games involving your watchlist</mj-text>
+        {% endif %}
+      </mj-column>
+    </mj-section>
+    {% else %}
+    {{ empty("No games involving your watchlist this week.") }}
+    {% endif %}
+    {% endif %}
+
+    {% if digest.watchlist is not none %}
+    {% set week = digest.watchlist %}
+    {{ heading("Watchlist last week", last_week ~ " · per game") }}
+    {% if week.rows %}
+    <mj-section>
+      <mj-column>
+        <mj-table>
+          <tr>{{ th("Player", "left") }}{{ th("MIN") }}{{ th("PTS") }}{{ th("REB") }}{{ th("AST") }}{{ th("TS") }}{{ th("3PA") }}</tr>
+          {% for row in week.rows %}
+          <tr>
+            <td align="left">{{ link(row.name, player_url(row.name, row.team_slug)) }}<br /><span style="font-size:11px;color:{{ muted }};">{{ row.tier | tier_label }} · {{ link(row.team_name, team_url(row.team_slug)) }} · {{ row.games }} G</span>{% if row.notable %}<br /><span style="font-size:11px;color:{{ alert }};">{{ row.notable }}</span>{% endif %}</td>
+            {{- td(row.minutes_per_game | one) }}{{ td(row.points_per_game | one) }}{{ td(row.rebounds_per_game | one) }}{{ td(row.assists_per_game | one) }}{{ td(row.true_shooting | percent) }}{{ td(row.threes_attempted_per_game | one) }}
+          </tr>
+          {% endfor %}
+        </mj-table>
+        {% if week.more_count %}
+        <mj-text font-size="12px" padding="8px 16px 0">+{{ week.more_count }} more: {{ link("Torvik player stats", players_url) }}</mj-text>
+        {% endif %}
+      </mj-column>
+    </mj-section>
+    {% else %}
+    {{ empty("No watchlist player's team played last week.") }}
+    {% endif %}
+    {% endif %}
+
+    {% if digest.freshmen is not none %}
+    {% set freshmen = digest.freshmen %}
+    {{ heading("Freshmen to watch", "Most minutes on top-100 teams, not on your watchlist · season, per game") }}
+    {% if freshmen.rows %}
+    <mj-section>
+      <mj-column>
+        <mj-table>
+          <tr>{{ th("Player", "left") }}{{ th("MIN") }}{{ th("PTS") }}{{ th("REB") }}{{ th("AST") }}{{ th("TS") }}</tr>
+          {% for row in freshmen.rows %}
+          <tr>
+            <td align="left">{{ link(row.name, player_url(row.name, row.team_slug)) }}<br /><span style="font-size:11px;color:{{ muted }};">{{ link(row.team_name, team_url(row.team_slug)) }} {{ row.team_rank | rank }} · {{ row.games }} G</span></td>
+            {{- td(row.minutes_per_game | one) }}{{ td(row.points_per_game | one) }}{{ td(row.rebounds_per_game | one) }}{{ td(row.assists_per_game | one) }}{{ td(row.true_shooting | percent) }}
+          </tr>
+          {% endfor %}
+        </mj-table>
+      </mj-column>
+    </mj-section>
+    {% else %}
+    {{ empty("No freshmen qualify yet.") }}
+    {% endif %}
+    {% endif %}
+
+    {% if digest.movers is not none %}
+    {% set moved = digest.movers %}
+    {{ heading("Top-25 movers", "CBBD adjusted net rating, change since last week") }}
+    {% if moved.baseline %}
+    {{ empty(baseline_line) }}
+    {% elif moved.rows %}
+    <mj-section>
+      <mj-column>
+        <mj-table>
+          <tr>{{ th("", "left") }}{{ th("Team", "left") }}{{ th("Change", "left") }}</tr>
+          {% for row in moved.rows %}
+          <tr>{{ td(row.rank | rank, "left") }}<td align="left">{{ link(row.display_name, team_url(row.slug)) }}</td>{{ td(row | change, "left") }}</tr>
+          {% endfor %}
+        </mj-table>
+        {% if moved.more_count %}
+        <mj-text font-size="12px" padding="8px 16px 0">+{{ moved.more_count }} more: {{ link(movers_more_label, ratings_url) }}</mj-text>
+        {% endif %}
+      </mj-column>
+    </mj-section>
+    {% else %}
+    {{ empty("No top-25 team moved three or more places.") }}
+    {% endif %}
+    {% endif %}
+
+    {% if digest.alerts %}
+    {{ heading("Watchlist alerts") }}
+    <mj-section>
+      <mj-column>
+        {% for a in digest.alerts %}
+        <mj-text font-size="13px" padding="4px 16px 0"><span style="color:{{ alert }};">{{ a.kind | alert_label }}:</span> {{ a.name }} <span style="color:{{ muted }};">({{ a.detail }})</span></mj-text>
+        {% endfor %}
+      </mj-column>
+    </mj-section>
+    {% endif %}
+
+    {% set footer = digest.footer %}
+    <mj-section padding="24px 0">
+      <mj-column>
+        <mj-divider border-width="1px" border-color="{{ rule }}" padding="0 16px 12px" />
+        <mj-text font-size="11px" color="{{ muted }}">
+          Run {{ footer.run_ts_et | stamp }} · data through {{ footer.data_as_of | long_date }} · run {{ footer.run_id }} · image {{ footer.image_sha | short_sha }} · {{ link("watchlist.yaml", footer.watchlist_url) }}<br />
+          Data: Torvik, CBBD, ESPN. Ranks are CBBD's adjusted net rating.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    </mj-wrapper>
+  </mj-body>
+</mjml>

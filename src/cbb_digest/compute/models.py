@@ -177,12 +177,17 @@ class Digest(_Model):
     failed source is `None`, so it is omitted from the email (§9.3). `alerts` are the alerts this
     run raised: resolution's, then `inactive` (§7.4). They are the only copy: the watchlist
     section's own `alerts` are moved here and left empty.
+
+    `torvik_teams` maps the slug of every team the sections name to its Torvik name, which the
+    email's Torvik links need along with `season` (§5).
     """
 
     run_id: str
     kind: Literal["digest"] = "digest"
+    season: int
     subject: str
     week_of: date
+    torvik_teams: dict[str, str] = {}
     banner: list[str] = []
     featured: FeaturedGamesSection | None
     watchlist: WatchlistWeekSection | None

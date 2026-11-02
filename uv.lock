@@ -54,6 +54,8 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "httpx" },
+    { name = "jinja2" },
+    { name = "mjml-python" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
@@ -77,6 +79,8 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.20.1" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "mjml-python", specifier = ">=1.4.2" },
     { name = "pydantic", specifier = ">=2.14.2" },
     { name = "pydantic-settings", specifier = ">=2.16.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
@@ -266,6 +270,18 @@ wheels = [
 ]
 
 [[package]]
+name = "jinja2"
+version = "3.1.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
+]
+
+[[package]]
 name = "mako"
 version = "1.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -394,6 +410,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "mjml-python"
+version = "1.4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/50/20c4f6d8ce095317b3bad5e287ba2131e9e43fb8db1a2744b5a3bc5d1119/mjml_python-1.4.2.tar.gz", hash = "sha256:a3b10d0325653e85a7d2c4180ebc521141bedc0944c9a334d075151500b252b5", size = 17980, upload-time = "2026-09-01T10:44:58.602Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/15/e05e37b710b874b905afc0fa1f31e31c0262450a3f24620e93fa6d50a286/mjml_python-1.4.2-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:29342a947af5a578cf30ed1802726e5ed71e7226a13af6b16030164ad836fde5", size = 551379, upload-time = "2026-09-01T10:44:49.002Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/70/09a519382e58aae8894c0213210339d5d5649f52db84ba499c99fb90dab3/mjml_python-1.4.2-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:0a79b021110ea36b5f86a57c3f95a38f0b94f32b8c5fc421b672783c7fc8e06c", size = 548813, upload-time = "2026-09-01T10:44:50.598Z" },
+    { url = "https://files.pythonhosted.org/packages/87/33/7d2fd059e99e38f813ea3682c5aa379dfe3c6587659c103a81e195964351/mjml_python-1.4.2-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0e91e925a2fc6324dc39fe7b500166d3480e70e00f13b2c3bb78b1953f887c45", size = 616839, upload-time = "2026-09-01T10:44:52.004Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/41/336a9a2d112662b4ded8d135573feda15fa67e2307fc8e8591be7b0ee939/mjml_python-1.4.2-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6d05b2b86679e6539b6eb63b027a56870af2e08b63c67bdddaaff2d532e6088d", size = 611726, upload-time = "2026-09-01T10:44:53.496Z" },
+    { url = "https://files.pythonhosted.org/packages/75/c4/d5e398455bc1295d35674c848391f0c461bb8dcb65d83b307f5d4bcd1afd/mjml_python-1.4.2-cp38-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:355bedef9e3d858425ca4664cd8f16849341db6abc15b351a846f12ec687db27", size = 793413, upload-time = "2026-09-01T10:44:54.812Z" },
+    { url = "https://files.pythonhosted.org/packages/38/91/b5e3606fbc61a0c05c3c9aa7ab3a7e2c8c2c79800c3179a154458cfd2611/mjml_python-1.4.2-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:e3cb288724e89125a9735e367345d01bdf4d1ac57e973650cb9c7929885fb7d3", size = 701351, upload-time = "2026-09-01T10:44:56.128Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/c7/518db6d835daaeb85608714a35cb738dd1a4e871b2b6d840a0f6c6c9bf76/mjml_python-1.4.2-cp38-abi3-win_amd64.whl", hash = "sha256:e4df81e22e5c9d93a9b799fd7eb2a9f1eba5edbc02efb43804de5a2a50d683e0", size = 451002, upload-time = "2026-09-01T10:44:57.426Z" },
 ]
 
 [[package]]
