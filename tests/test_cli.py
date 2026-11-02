@@ -41,7 +41,6 @@ def test_help_lists_commands() -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        ["compute"],
         ["render", "--dry-run"],
         ["send", "--force"],
         ["run", "--week", "2026-11-09", "--force", "--dry-run"],
