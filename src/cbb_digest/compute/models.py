@@ -125,3 +125,30 @@ class WatchlistWeekSection(_Model):
     rows: list[WatchlistWeekRow] = []
     more_count: int = 0
     alerts: list[Alert] = []
+
+
+class FreshmanRow(_Model):
+    """One freshman to watch (spec §8.5), from Torvik's season-to-date totals.
+
+    `name` is Torvik's spelling and `team_name` CBBD's; `team_rank` is this run's ratings rank.
+    The per-game figures are season totals over `games`, and `true_shooting` is a fraction, `None`
+    when the player took no field-goal or free-throw attempts.
+    """
+
+    name: str
+    torvik_pid: int
+    team_slug: str
+    team_name: str
+    team_rank: int
+    games: int
+    minutes_per_game: float
+    points_per_game: float
+    rebounds_per_game: float
+    assists_per_game: float
+    true_shooting: float | None
+
+
+class FreshmenSection(_Model):
+    """Section 3: at most 5 freshmen, with no `+N more`."""
+
+    rows: list[FreshmanRow] = []
