@@ -80,7 +80,7 @@ grep '^DRY_RUN=' .env              # DRY_RUN=true
 
 `RECIPIENTS` already defaults to `tom@tomboone.com`. Every other variable stays blank for now: the
 Resend credentials are set for the first real send (step 6), and the healthchecks.io URL when the
-digest goes live. Every variable and its default is documented in `.env.example`.
+digest goes live (step 8). Every variable and its default is documented in `.env.example`.
 
 With `DRY_RUN=true`, a run renders the digest to `data/out/` and writes it to
 `data/outbox/<run id>.html` instead of emailing it. A dry run never blocks the real send of the
@@ -212,7 +212,7 @@ the subject `CBB digest — week of <Mon D>`, for example `CBB digest — week o
 - it reads correctly in the Fastmail app on your phone, with no sideways scrolling.
 
 File each rendering problem as a bug ticket against the templates. Turning on the weekly send is the
-go-live step, not this one.
+go-live step (step 8), not this one.
 
 ## 7. Nightly backup to B2
 
@@ -263,15 +263,26 @@ mountpoint /mnt/music && mkdir -p /mnt/music/cbb-digest/backups
 The first command prints `/mnt/music is a mountpoint`; if it doesn't, the drive is not mounted, and
 the directory is not created.
 
-**3. A push monitor** on the Kuma on kumadrome (`http://127.0.0.1:3001`): *Add New Monitor*, type
-*Push*, name `kumadrome/cbb-digest-backup`, heartbeat interval 25 h (90000 s), retries 0. Copy its
-push URL.
+**3. A push monitor** on the ops Kuma, which runs on kumadrome. Open
+`https://kuma.tail1afe5a.ts.net` in a browser on any tailnet device and log in as the admin. Choose
+*Add New Monitor* and set:
+
+- *Monitor Type*: *Push*;
+- *Friendly Name*: `kumadrome/cbb-digest-backup`;
+- *Heartbeat Interval*: `90000` (25 h);
+- *Retries*: `0`;
+- *Notifications*: `Discord #alerts` ticked. It is on by default, and it is the only notification
+  the ops Kuma has.
+
+*Save*, then copy the *Push URL* the monitor page shows.
 
 **4. Settings.** Copy the template, set the B2 destination from the Navidrome backup's bucket (its
-`DB_REMOTE`), and
-set the push URL from step 3. Paste the URL at the `Kuma push URL:` prompt and press Enter. It is
-written in double quotes: the file is sourced, and an unquoted `&` from Kuma's default
-`?status=up&msg=OK&ping=` query would leave `PING_URL` unset and skip the ping silently.
+`DB_REMOTE`), and set the push URL from step 3. Paste the URL at the `Kuma push URL:` prompt and
+press Enter. Kuma shows the URL on its tailnet name, but jobs on kumadrome push over loopback, as the
+Navidrome and closinglineup backups do, so only the token is kept and the rest is written as
+`http://127.0.0.1:3001`. The URL is written in double quotes because the file is sourced and a
+hand-pasted `&` from Kuma's default `?status=up&msg=OK&ping=` query would otherwise leave `PING_URL`
+unset and skip the ping silently.
 
 ```sh
 cp backup/cbb-digest-backup.env.example ~/.config/cbb-digest-backup.env
@@ -280,19 +291,23 @@ bucket=$(sed -n 's#^DB_REMOTE=b2:\([^/]*\)/.*#\1#p' ~/.config/navidrome-backup.e
 [ -n "$bucket" ] && sed -i "s#^REMOTE=.*#REMOTE=b2:$bucket/cbb-digest-backups#" ~/.config/cbb-digest-backup.env \
   || echo 'no bucket: DB_REMOTE=b2:<bucket>/… not found in ~/.config/navidrome-backup.env'
 printf 'Kuma push URL: ' && read -r PING_URL
-sed -i '/^PING_URL=/d' ~/.config/cbb-digest-backup.env && printf 'PING_URL="%s"\n' "$PING_URL" >>~/.config/cbb-digest-backup.env
-unset bucket PING_URL
+token=${PING_URL##*/api/push/}; token=${token%%\?*}
+sed -i '/^PING_URL=/d' ~/.config/cbb-digest-backup.env && printf 'PING_URL="http://127.0.0.1:3001/api/push/%s"\n' "$token" >>~/.config/cbb-digest-backup.env
+unset bucket PING_URL token
 ```
 
 Check every value took:
 
 ```sh
 grep -E '^[A-Z_]+=' ~/.config/cbb-digest-backup.env
+grep -c '^PING_URL="http://127.0.0.1:3001/api/push/[A-Za-z0-9]\{1,\}"$' ~/.config/cbb-digest-backup.env   # 1
 ```
 
-It prints `MOUNT_POINT=/mnt/music`, `BACKUP_DIR=/mnt/music/cbb-digest/backups`, `KEEP_DAYS=14`,
-`REMOTE=b2:<the bucket>/cbb-digest-backups` with a real bucket name after `b2:`, and
-`PING_URL="http://127.0.0.1:3001/api/push/…"`. No line still contains `<bucket>` or `<token>`.
+The first prints `MOUNT_POINT=/mnt/music`, `BACKUP_DIR=/mnt/music/cbb-digest/backups`,
+`KEEP_DAYS=14`, `REMOTE=b2:<the bucket>/cbb-digest-backups` with a real bucket name after `b2:`,
+and `PING_URL="http://127.0.0.1:3001/api/push/…"`. No line still contains `<bucket>` or `<token>`.
+The second prints `1`; `0` means the token is empty or the paste was not Kuma's push URL, so run
+the `Kuma push URL:` lines again.
 
 **5. Timer**, and a first run in the foreground. Run it with `cbb-digest` up (`docker compose ps`
 shows it `healthy`):
@@ -364,6 +379,109 @@ starts between Monday 07:00 and Tuesday noon: the drill's `runs` shows whether t
 week's run as `sent`. If it does not, and you don't want the week sent twice, leave out the
 `docker compose start` line and run it after Tuesday 12:00 instead; `serve` then records the week
 `skipped_missed` and sends nothing.
+
+## 8. Go live
+
+Going live turns on the healthchecks.io check and the nightly backup, switches `DRY_RUN` off so
+`serve` emails the digest every Monday at 07:00 Eastern, and then leaves it alone for two Mondays.
+Do it after the first real send (step 6). Every command runs in `~/cbb-digest/deploy/` on kumadrome.
+
+### 1. The healthchecks.io check
+
+`serve` pings it once for every scheduled week, sent or skipped, in season or out, so it never needs
+pausing. A week that fails pings `/fail` with the reason, and a week that never runs misses its ping.
+Either way healthchecks.io emails you.
+
+1. In [healthchecks.io](https://healthchecks.io), choose **Add Check**.
+2. Set the name to `cbb-digest`.
+3. Choose **Change Schedule…**, keep the **Simple** tab, and set **Period** to 7 days and **Grace
+   Time** to 26 hours. Then choose **Save**.
+4. Under **Notification Methods** on the check's page, keep **Email** switched on.
+5. Copy the ping URL from **How To Ping**. It looks like `https://hc-ping.com/<uuid>`.
+
+Set it in `.env`. Anyone holding the URL can ping the check, so it is read without echoing it. Paste
+it at the `healthchecks ping URL:` prompt and press Enter:
+
+```sh
+printf 'healthchecks ping URL: ' && read -rs HEALTHCHECKS_URL && echo
+sed -i '/^HEALTHCHECKS_URL=/d' .env && printf 'HEALTHCHECKS_URL=%s\n' "$HEALTHCHECKS_URL" >>.env
+unset HEALTHCHECKS_URL
+grep -c '^HEALTHCHECKS_URL=https://hc-ping.com/..*' .env   # 1
+```
+
+Ping it once by hand to check the URL:
+
+```sh
+curl -fsS -m 10 "$(sed -n 's/^HEALTHCHECKS_URL=//p' .env)"; echo
+```
+
+It prints `OK`, and the check turns green (**up**) in healthchecks.io. The container picks up the
+URL when it restarts in part 3.
+
+### 2. The nightly backup
+
+Follow [§7 Install](#install), steps 1 to 5, in full. Its step 5 starts the timer and runs the
+backup once by hand. Then check the backup took:
+
+- `systemctl list-timers cbb-digest-backup.timer` lists the timer, with its next run after 05:30;
+- in Kuma, `kumadrome/cbb-digest-backup` shows an **Up** heartbeat;
+- `. ~/.config/cbb-digest-backup.env && rclone ls "$REMOTE"` lists at least one
+  `cbb-digest-<timestamp>.sqlite3`.
+
+### 3. Switch `DRY_RUN` off
+
+```sh
+sed -i '/^#\? *DRY_RUN=/d' .env && echo 'DRY_RUN=false' >>.env
+grep '^DRY_RUN=' .env   # DRY_RUN=false
+docker compose up -d
+docker compose ps
+```
+
+`cbb-digest` shows `healthy` within a minute. Check that the container sees both settings:
+
+```sh
+docker compose exec -T cbb-digest printenv DRY_RUN                                    # false
+docker compose exec -T cbb-digest printenv HEALTHCHECKS_URL | grep -c '^https://hc-ping.com/'   # 1
+```
+
+When you restart decides whether this week is emailed now:
+
+- **Before Monday 07:00 Eastern**, nothing happens until 07:00 Monday.
+- **From Monday 07:00 until Tuesday 12:00 Eastern**, if the week has not been emailed yet, `serve`
+  runs it straight after the restart. It emails the digest once the sources are fetched, usually
+  within minutes, or about 30 minutes later if a source fails and is retried. A dry run's outbox
+  send does not count as emailed (spec §9.2). If you don't want this week's digest now, do this
+  part after Tuesday 12:00.
+- **After Tuesday 12:00 Eastern**, nothing more is sent for this week. The first email goes out the
+  next Monday at 07:00.
+
+In every case the log shows the next send time:
+
+```sh
+docker compose logs cbb-digest | grep '"next send"' | tail -1
+```
+
+It prints a line whose `send_at` is the next Monday at `07:00:00-05:00` (`-04:00` while daylight
+saving time is in effect). If this week's email has just gone out, the log also has a
+`"running the week"` line.
+
+### 4. Soak: two Mondays untouched
+
+Leave kumadrome alone for two consecutive Mondays: no restarts, no `.env` edits, no runs by hand.
+Watchtower's automatic updates are fine. After each Monday's digest arrives, run this read-only
+query and paste its output into a comment on NEU-2117:
+
+```sh
+docker compose exec cbb-digest python -c "import sqlite3; print(sqlite3.connect('/data/cbb-digest.sqlite3').execute('select run_id, status, transport, sent_at, failed_sources from runs order by started_at desc limit 1').fetchall())"
+```
+
+It prints that Monday's run id, its status (`'sent'`, or `'sent_degraded'` if a source failed),
+the transport (`'resend'`, or `'smtp'` if the Fastmail fallback sent it), the send time in UTC,
+and the failed sources (`'[]'` when none failed). Going live is done when both Mondays show `sent`
+or `sent_degraded`, the healthchecks.io check is green, and `kumadrome/cbb-digest-backup` is up in
+Kuma.
+
+Anything that goes wrong during the soak becomes a bug ticket.
 
 ## Day-to-day
 
