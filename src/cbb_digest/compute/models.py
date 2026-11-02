@@ -1,10 +1,10 @@
-"""The digest's sections, field for field (spec §5).
+"""The digest, field for field (spec §5).
 
-Each section is its own model, so each builder can be tested on its own; the `Digest` that holds
-them is assembled by the `compute` command.
+Each section is its own model, so each builder can be tested on its own. `Digest` holds them, and
+is the only thing the templates read; `compute.build` assembles it.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -152,3 +152,41 @@ class FreshmenSection(_Model):
     """Section 3: at most 5 freshmen, with no `+N more`."""
 
     rows: list[FreshmanRow] = []
+
+
+class Footer(_Model):
+    """Section 6: where this digest came from.
+
+    `run_ts_et` is when it was computed, aware Eastern. `data_as_of` is the last day of last week,
+    the day the stats run through. `image_sha` is the commit the image was built from, and `None`
+    when running from a checkout; `watchlist_url` points at `watchlist.yaml` at that commit, or on
+    `main` without one.
+    """
+
+    run_ts_et: datetime
+    data_as_of: date
+    run_id: str
+    image_sha: str | None
+    watchlist_url: str
+
+
+class Digest(_Model):
+    """One week's digest, the only thing the templates may read (spec §5).
+
+    `banner` holds one line per source that failed this run, and a section that depends on a
+    failed source is `None`, so it is omitted from the email (§9.3). `alerts` are the alerts this
+    run raised: resolution's, then `inactive` (§7.4). They are the only copy: the watchlist
+    section's own `alerts` are moved here and left empty.
+    """
+
+    run_id: str
+    kind: Literal["digest"] = "digest"
+    subject: str
+    week_of: date
+    banner: list[str] = []
+    featured: FeaturedGamesSection | None
+    watchlist: WatchlistWeekSection | None
+    freshmen: FreshmenSection | None
+    movers: MoversSection | None
+    alerts: list[Alert] = []
+    footer: Footer

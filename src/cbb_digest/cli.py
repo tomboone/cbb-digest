@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 
 from cbb_digest import db, liveness
+from cbb_digest.atomic import write_atomic
 from cbb_digest.clock import SystemClock
 from cbb_digest.collect import (
     RequestCounter,
@@ -23,6 +24,7 @@ from cbb_digest.collect import (
     live_clients,
     teams_cached,
 )
+from cbb_digest.compute.build import build_digest, failed_sources
 from cbb_digest.load import TABLES, LoadError, LoadInput, TableReport, stored_cbbd_teams
 from cbb_digest.load import load as load_sources
 from cbb_digest.logging import configure_logging
@@ -54,6 +56,8 @@ WeekOption = Annotated[
 ]
 
 CACHE_DIRNAME = "cache"
+OUT_DIRNAME = "out"
+DIGEST_JSON = "digest.json"
 
 
 def _bootstrap() -> Settings:
@@ -271,9 +275,55 @@ def _resolution_table(entries: list[Entry]) -> list[str]:
 
 
 @app.command()
-def compute() -> None:
-    """Build the digest model from the database."""
-    _not_implemented("compute")
+def compute(week: WeekOption = None) -> None:
+    """Build the digest from the database and write it to out/digest.json.
+
+    A source missing from the cache or failing validation is treated as failed for this run, as
+    `load` treats it: its banner line is printed and its sections are omitted (spec §9.3).
+    """
+    wl = _load_watchlist()
+    settings = _bootstrap()
+    monday = _monday(week)
+    clients = cache_only_clients()
+    try:
+        sources = collect(
+            clients, _cache(settings), season=wl.season, this_week_start=monday, include_teams=False
+        )
+    finally:
+        clients.close()
+    failed = failed_sources(sources)
+
+    engine = db.open_database(settings.data_dir)
+    try:
+        with engine.begin() as connection:
+            digest = build_digest(
+                connection,
+                wl,
+                monday,
+                failed=failed,
+                now=SystemClock().now(),
+                image_sha=settings.image_sha,
+            )
+    except (LookupError, ValueError, ResolveError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    finally:
+        engine.dispose()
+
+    path = settings.data_dir / OUT_DIRNAME / DIGEST_JSON
+    write_atomic(path, digest.model_dump_json(indent=2) + "\n")
+    typer.echo(f"week of {monday.isoformat()}, run {digest.run_id}")
+    for line in digest.banner:
+        typer.echo(f"banner: {line}")
+    for name, section in (
+        ("featured", digest.featured),
+        ("watchlist", digest.watchlist),
+        ("freshmen", digest.freshmen),
+        ("movers", digest.movers),
+    ):
+        typer.echo(f"{name}: {'omitted' if section is None else f'{len(section.rows)} rows'}")
+    typer.echo(f"alerts: {len(digest.alerts)}")
+    typer.echo(f"wrote {path}")
 
 
 @app.command()

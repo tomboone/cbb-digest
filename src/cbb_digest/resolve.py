@@ -219,6 +219,39 @@ def resolved_players(connection: Connection, watchlist: Watchlist) -> list[Resol
     return found
 
 
+def raised_alerts(connection: Connection, watchlist: Watchlist, run_id: str) -> list[Alert]:
+    """The resolution alerts `run_id` raised, in watchlist order: those of the entries whose row
+    it last changed, as `resolve` returned them (§7.4).
+
+    Read back from `watchlist_resolution`, so the compute step can list them without resolving
+    again, and a run that skipped resolution because Torvik failed (§9.3) lists none of its own.
+    Raises `ResolveError` when `teams` is empty.
+    """
+    team_index = _team_index(connection)
+    query = select(
+        watchlist_resolution.c.watchlist_key,
+        watchlist_resolution.c.alert_kind,
+        watchlist_resolution.c.alert_detail,
+    ).where(
+        watchlist_resolution.c.season == watchlist.season,
+        watchlist_resolution.c.changed_run_id == run_id,
+        watchlist_resolution.c.alert_kind.is_not(None),
+    )
+    stored = {row.watchlist_key: row for row in connection.execute(query)}
+
+    alerts: list[Alert] = []
+    for player in watchlist.players:
+        mapped, slugs = _stated_team(player, team_index)
+        if mapped:
+            key = watchlist_key(player, next(iter(slugs), None))
+        else:
+            key = unmapped_watchlist_key(player)
+        row = stored.get(key)
+        if row is not None:
+            alerts.append(Alert(row.alert_kind, player.name, row.alert_detail or ""))
+    return alerts
+
+
 def _stated_team(player: WatchlistPlayer, team_index: _Teams) -> tuple[bool, frozenset[str]]:
     """Whether the entry's stated team maps, and the slugs it names: none when the entry states
     no team (which counts as mapped), exactly one when it maps. `resolve` and
