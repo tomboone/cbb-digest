@@ -64,7 +64,16 @@ Plain responsive HTML (MJML) with a text part. Readable on a phone in under five
 
 **TS%** = PTS / (2 × (FGA + 0.44 × FTA)) over the games in the window. It shows `—` when FGA + FTA = 0.
 
-**Formatting:** per-game stats to one decimal; percentages as whole numbers (`TS 58%`); times as `7:00 PM ET`; ranks as `#12`. Every team and player name links to its Torvik page. Players: `https://barttorvik.com/playerstat.php?link=y&year=<season>&p=<name>&t=<torvik team>`. Teams: `https://barttorvik.com/team.php?team=<torvik team>&year=<season>`. Names are URL-encoded (`p=Bennett%20Stirtz`). These are links for the reader's browser only. The player page answers a non-browser client with Torvik's browser check (§6), and the pipeline never fetches either page, so the probe could not open them. Both forms come from a GitHub code search on 2026-11-01. The player form there carries `year=`, which the original form lacked. The team form matched the original. Clicking one of each in the first dry-run digest is the check.
+**Formatting:** per-game stats to one decimal; percentages as whole numbers (`TS 58%`); times as `7:00 PM ET`; ranks as `#12`. Every team and player name in sections 1–4 links to its Torvik page, with two exceptions. A team the crosswalk does not know, such as a non-D-I opponent, is shown under ESPN's name without a link (§7.5). The watchlist alerts (section 5) name each entry as written in `watchlist.yaml`, without a link: an alert carries no Torvik id or team, and an unresolved or ambiguous entry has no page to link to. Names are URL-encoded (`p=Bennett%20Stirtz`). The link forms, all confirmed by clicking them in a browser on 2026-11-01:
+
+| Link | URL |
+|---|---|
+| Player | `https://barttorvik.com/playerstat.php?link=y&year=<season>&p=<name>&t=<torvik team>` |
+| Team | `https://barttorvik.com/team.php?team=<torvik team>&year=<season>` |
+| Watchlist `+N more` (Torvik's player list) | `https://barttorvik.com/playerstat.php?link=y&year=<season>` |
+| Movers `+N more` (Torvik's T-Rank page) | `https://barttorvik.com/trank.php?year=<season>` |
+
+These are links for the reader's browser only. Torvik answers a non-browser client on the player page and `trank.php` with its browser check (§6), and the pipeline never fetches any of them. The player and team forms come from a GitHub code search on 2026-11-01. The player form there carries `year=`, which the original form lacked; the team form matched the original. The two `+N more` forms were chosen when the templates were built (NEU-2110).
 
 ## 6. Data sources
 
