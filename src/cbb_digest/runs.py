@@ -129,6 +129,13 @@ def record_send(connection: Connection, *, run_id: str, transport: str, sent_at:
         )
 
 
+def run_status(connection: Connection, run_id: str) -> str | None:
+    """`run_id`'s status, `running` included; `None` when it has no row."""
+    return connection.execute(
+        select(runs.c.status).where(runs.c.run_id == run_id)
+    ).scalar_one_or_none()
+
+
 def has_run(connection: Connection, run_id: str) -> bool:
     return (
         connection.execute(select(runs.c.run_id).where(runs.c.run_id == run_id)).first() is not None

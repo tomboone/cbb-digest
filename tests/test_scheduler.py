@@ -1,14 +1,18 @@
 import threading
 from collections.abc import Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 
 from cbb_digest import db, liveness
+from cbb_digest.clock import Clock
+from cbb_digest.runs import SENT_STATUSES, FinalStatus, finish_run, start_run
 from cbb_digest.scheduler import MAX_SLEEP, Scheduler, next_send_time
+from cbb_digest.schema import runs
+from cbb_digest.weeks import run_id_for, windows_for
 from tests.fakes import FakeClock
 
 EASTERN = ZoneInfo("America/New_York")
@@ -63,10 +67,94 @@ def engine(tmp_path: Path) -> Iterator[Engine]:
     engine.dispose()
 
 
+SEASON = 2027
+# Monday 2026-11-16, run 2027-W47.
+MONDAY = date(2026, 11, 16)
+RUN_ID = run_id_for(MONDAY, SEASON)
+
+
+class FakeRun:
+    """Stands in for `run`: records each Monday it is called for, at what time, and then
+    either raises `error` or records the week with `status`, as the real `run` would."""
+
+    def __init__(
+        self,
+        clock: Clock,
+        engine: Engine,
+        *,
+        status: FinalStatus = "sent",
+        error: Exception | None = None,
+    ) -> None:
+        self.calls: list[tuple[date, datetime]] = []
+        self._clock = clock
+        self._engine = engine
+        self._status: FinalStatus = status
+        self._error = error
+
+    def __call__(self, monday: date) -> None:
+        self.calls.append((monday, self._clock.now()))
+        if self._error is not None:
+            raise self._error
+        _record(self._engine, self._status, at=self._clock.now())
+
+
+def _record(
+    engine: Engine, status: FinalStatus | None, *, at: datetime, transport: str = "resend"
+) -> None:
+    """Give `RUN_ID` a row ending in `status`, or left `running` when it is `None`."""
+    with engine.begin() as connection:
+        start_run(
+            connection,
+            run_id=RUN_ID,
+            kind="digest",
+            season=SEASON,
+            windows=windows_for(MONDAY),
+            image_sha=None,
+            now=at,
+        )
+        if status is not None:
+            sent = status in SENT_STATUSES
+            finish_run(
+                connection,
+                run_id=RUN_ID,
+                status=status,
+                row_counts={},
+                failed_sources=[],
+                alerts=[],
+                transport=transport if sent else None,
+                now=at,
+            )
+
+
+def _status(engine: Engine) -> str | None:
+    with engine.connect() as connection:
+        return connection.execute(
+            select(runs.c.status).where(runs.c.run_id == RUN_ID)
+        ).scalar_one_or_none()
+
+
+def _scheduler(
+    clock: Clock,
+    engine: Engine,
+    *,
+    run_week: FakeRun | None = None,
+    dry_run: bool = False,
+    stop: threading.Event | None = None,
+) -> Scheduler:
+    return Scheduler(
+        clock,
+        engine,
+        season=SEASON,
+        run_week=run_week or FakeRun(clock, engine),
+        dry_run=dry_run,
+        stop=stop,
+    )
+
+
 def test_a_cycle_writes_the_heartbeat_and_sleeps_at_most_an_hour(engine: Engine) -> None:
     clock = FakeClock(et(2026, 11, 18, 12))
 
-    Scheduler(clock, engine).cycle()
+    _scheduler(clock, engine).cycle()
 
     assert liveness.last_tick(engine) == et(2026, 11, 18, 12)
     assert clock.sleeps == [et(2026, 11, 18, 12) + MAX_SLEEP]
@@ -75,14 +163,14 @@ def test_a_cycle_writes_the_heartbeat_and_sleeps_at_most_an_hour(engine: Engine)
 def test_a_cycle_wakes_at_the_send_time_when_it_is_under_an_hour_away(engine: Engine) -> None:
     clock = FakeClock(et(2026, 11, 16, 6, 30))
 
-    Scheduler(clock, engine).cycle()
+    _scheduler(clock, engine).cycle()
 
     assert clock.sleeps == [et(2026, 11, 16, 7)]
 
 
 def test_each_cycle_refreshes_the_heartbeat(engine: Engine) -> None:
     clock = FakeClock(et(2026, 11, 18, 12))
-    scheduler = Scheduler(clock, engine)
+    scheduler = _scheduler(clock, engine)
 
     scheduler.cycle()
     scheduler.cycle()
@@ -108,7 +196,216 @@ def test_run_forever_returns_once_stop_is_set(engine: Engine) -> None:
     stop = threading.Event()
     clock = StoppingClock(et(2026, 11, 18, 12), stop, n=3)
 
-    Scheduler(clock, engine, stop=stop).run_forever()
+    _scheduler(clock, engine, stop=stop).run_forever()
 
     assert len(clock.sleeps) == 3
     assert liveness.last_tick(engine) == et(2026, 11, 18, 14)
+
+
+def test_a_boot_at_monday_0600_sleeps_until_0700_then_runs_once(engine: Engine) -> None:
+    stop = threading.Event()
+    clock = StoppingClock(et(2026, 11, 16, 6), stop, n=4)
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run, stop=stop).run_forever()
+
+    assert clock.sleeps[0] == et(2026, 11, 16, 7)
+    assert fake_run.calls == [(MONDAY, et(2026, 11, 16, 7))]
+    assert _status(engine) == "sent"
+
+
+def test_a_boot_at_monday_0900_with_the_week_unsent_runs_at_once(engine: Engine) -> None:
+    clock = FakeClock(et(2026, 11, 16, 9))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert fake_run.calls == [(MONDAY, et(2026, 11, 16, 9))]
+    assert clock.sleeps == [et(2026, 11, 16, 10)]
+
+
+@pytest.mark.parametrize("status", ["sent", "sent_degraded", "skipped_offseason"])
+def test_a_boot_at_monday_0900_with_the_week_settled_does_not_run(
+    engine: Engine, status: FinalStatus
+) -> None:
+    _record(engine, status, at=et(2026, 11, 16, 7, 5))
+    clock = FakeClock(et(2026, 11, 16, 9))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert fake_run.calls == []
+    assert _status(engine) == status
+
+
+def test_a_boot_on_a_week_that_failed_runs_it_again(engine: Engine) -> None:
+    # A restart is the retry: a fix redeployed on Monday morning still makes that week's send.
+    _record(engine, "failed", at=et(2026, 11, 16, 7, 5))
+    clock = FakeClock(et(2026, 11, 16, 9))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert len(fake_run.calls) == 1
+    assert _status(engine) == "sent"
+
+
+def test_a_boot_at_tuesday_1159_still_catches_the_week_up(engine: Engine) -> None:
+    clock = FakeClock(et(2026, 11, 17, 11, 59))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert fake_run.calls == [(MONDAY, et(2026, 11, 17, 11, 59))]
+
+
+@pytest.mark.parametrize(
+    "now",
+    [
+        pytest.param(et(2026, 11, 17, 12), id="tuesday-12:00"),
+        pytest.param(et(2026, 11, 17, 13), id="tuesday-13:00"),
+        pytest.param(et(2026, 11, 22, 23), id="sunday-23:00"),
+    ],
+)
+def test_a_boot_after_tuesday_noon_with_the_week_unsent_records_it_missed(
+    engine: Engine, now: datetime
+) -> None:
+    clock = FakeClock(now)
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert fake_run.calls == []
+    assert _status(engine) == "skipped_missed"
+
+
+def test_a_week_left_running_after_tuesday_noon_is_recorded_missed(engine: Engine) -> None:
+    # A `running` row is not an outcome: `load` run alone, or a run killed mid-way.
+    _record(engine, None, at=et(2026, 11, 16, 7, 5))
+
+    _scheduler(FakeClock(et(2026, 11, 17, 13)), engine).cycle()
+
+    assert _status(engine) == "skipped_missed"
+
+
+@pytest.mark.parametrize("status", ["sent", "sent_degraded", "skipped_offseason", "failed"])
+def test_a_week_with_an_outcome_is_left_alone_after_tuesday_noon(
+    engine: Engine, status: FinalStatus
+) -> None:
+    _record(engine, status, at=et(2026, 11, 16, 7, 5))
+
+    _scheduler(FakeClock(et(2026, 11, 17, 13)), engine).cycle()
+
+    assert _status(engine) == status
+
+
+def test_a_week_emailed_but_left_running_is_not_recorded_missed(engine: Engine) -> None:
+    # The email went out and the run died before finishing: it was not missed.
+    _record(engine, "sent", at=et(2026, 11, 16, 7, 5))
+    _record(engine, None, at=et(2026, 11, 16, 8))
+
+    _scheduler(FakeClock(et(2026, 11, 17, 13)), engine).cycle()
+
+    assert _status(engine) == "running"
+
+
+def test_a_run_started_by_hand_after_tuesday_noon_is_left_running(engine: Engine) -> None:
+    _record(engine, None, at=et(2026, 11, 17, 14))
+
+    _scheduler(FakeClock(et(2026, 11, 17, 15)), engine).cycle()
+
+    assert _status(engine) == "running"
+
+
+def test_monday_before_0700_leaves_the_week_alone(engine: Engine) -> None:
+    clock = FakeClock(et(2026, 11, 16, 6, 59))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert fake_run.calls == []
+    assert _status(engine) is None
+
+
+def test_an_exception_in_run_leaves_serve_alive_and_records_failed(engine: Engine) -> None:
+    stop = threading.Event()
+    clock = StoppingClock(et(2026, 11, 16, 9), stop, n=3)
+    fake_run = FakeRun(clock, engine, error=RuntimeError("boom"))
+
+    _scheduler(clock, engine, run_week=fake_run, stop=stop).run_forever()
+
+    assert _status(engine) == "failed"
+    # Still looping: ticking, sleeping, and trying the week again once each cycle.
+    assert len(clock.sleeps) == 3
+    assert liveness.last_tick(engine) == et(2026, 11, 16, 11)
+    assert [at for _, at in fake_run.calls] == [
+        et(2026, 11, 16, 9),
+        et(2026, 11, 16, 10),
+        et(2026, 11, 16, 11),
+    ]
+
+
+def test_a_failed_week_is_retried_hourly_until_it_sends(engine: Engine) -> None:
+    stop = threading.Event()
+    clock = StoppingClock(et(2026, 11, 16, 9), stop, n=4)
+    failing = FakeRun(clock, engine, error=RuntimeError("Resend down"))
+    working = FakeRun(clock, engine)
+
+    def run_week(monday: date) -> None:
+        (failing if not failing.calls else working)(monday)
+
+    scheduler = Scheduler(clock, engine, season=SEASON, run_week=run_week, stop=stop)
+    scheduler.run_forever()
+
+    assert len(failing.calls) == 1
+    assert working.calls == [(MONDAY, et(2026, 11, 16, 10))]
+    assert _status(engine) == "sent"
+
+
+def test_a_failed_week_is_not_retried_after_tuesday_noon(engine: Engine) -> None:
+    _record(engine, "failed", at=et(2026, 11, 17, 11))
+    clock = FakeClock(et(2026, 11, 17, 12))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert fake_run.calls == []
+    assert _status(engine) == "failed"
+
+
+def test_a_failed_run_that_recorded_itself_keeps_its_own_row(engine: Engine) -> None:
+    clock = FakeClock(et(2026, 11, 16, 9))
+
+    class RecordsThenRaises(FakeRun):
+        def __call__(self, monday: date) -> None:
+            _record(engine, "failed", at=et(2026, 11, 16, 8))
+            raise RuntimeError("boom")
+
+    _scheduler(clock, engine, run_week=RecordsThenRaises(clock, engine)).cycle()
+
+    with engine.connect() as connection:
+        finished_at = connection.execute(
+            select(runs.c.finished_at).where(runs.c.run_id == RUN_ID)
+        ).scalar_one()
+    assert finished_at == et(2026, 11, 16, 8)
+
+
+def test_a_dry_run_week_does_not_block_the_real_send(engine: Engine) -> None:
+    # Spec §9.2: an outbox send emailed nobody, so the real serve still sends the week.
+    _record(engine, "sent", at=et(2026, 11, 16, 7, 5), transport="outbox")
+    clock = FakeClock(et(2026, 11, 16, 9))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run).cycle()
+
+    assert len(fake_run.calls) == 1
+
+
+def test_a_dry_run_serve_does_not_repeat_a_week_it_dry_ran(engine: Engine) -> None:
+    _record(engine, "sent", at=et(2026, 11, 16, 7, 5), transport="outbox")
+    clock = FakeClock(et(2026, 11, 16, 9))
+    fake_run = FakeRun(clock, engine)
+
+    _scheduler(clock, engine, run_week=fake_run, dry_run=True).cycle()
+
+    assert fake_run.calls == []

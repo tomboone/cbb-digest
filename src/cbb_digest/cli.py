@@ -9,7 +9,7 @@ import signal
 import threading
 from collections.abc import Collection, Sized
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from types import FrameType
 from typing import Annotated, NoReturn
@@ -680,9 +680,17 @@ def _run_week(
     return status
 
 
+def _run_scheduled(monday: date) -> None:
+    """`run` for the week of `monday`, as `serve` dispatches it: never forced, and dry only when
+    `DRY_RUN` says so."""
+    run(week=datetime.combine(monday, time()), force=False, dry_run=False)
+
+
 @app.command()
 def serve() -> None:
-    """Run the weekly scheduler loop (container entrypoint)."""
+    """Run the weekly scheduler loop (container entrypoint): run each week at Monday 07:00
+    Eastern, catching a missed Monday up until Tuesday noon (spec §9.2)."""
+    season = _load_watchlist().season
     settings = _bootstrap()
     engine = db.open_database(settings.data_dir)
     stop = threading.Event()
@@ -694,7 +702,15 @@ def serve() -> None:
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, on_signal)
     try:
-        Scheduler(SystemClock(stop), engine, stop=stop).run_forever()
+        Scheduler(
+            SystemClock(stop),
+            engine,
+            season=season,
+            run_week=_run_scheduled,
+            dry_run=settings.dry_run,
+            image_sha=settings.image_sha,
+            stop=stop,
+        ).run_forever()
     finally:
         engine.dispose()
     log.info("scheduler stopped")
