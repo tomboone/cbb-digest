@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -105,7 +105,12 @@ def test_serve_migrates_and_ticks_so_health_passes(
     def no_handler(signum: int, handler: object) -> None:
         return None
 
+    # Today may be inside the Monday-to-Tuesday-noon window: never run a real week here.
+    def no_run(monday: date) -> None:
+        return None
+
     monkeypatch.setattr(cli, "SystemClock", fake_clock)
+    monkeypatch.setattr(cli, "_run_scheduled", no_run)
     monkeypatch.setattr(Scheduler, "run_forever", Scheduler.cycle)
     monkeypatch.setattr(cli.signal, "signal", no_handler)
 
@@ -114,3 +119,31 @@ def test_serve_migrates_and_ticks_so_health_passes(
 
     assert serve.exit_code == 0, serve.output
     assert health.exit_code == 0, health.output
+
+
+def test_serve_dispatches_the_week_through_run(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Monday 2026-11-16 09:00 Eastern: inside the window, with the week unsent.
+    monday = date(2026, 11, 16)
+    now = datetime(2026, 11, 16, 14, tzinfo=UTC)
+    calls: list[tuple[datetime | None, bool, bool]] = []
+
+    def fake_clock(stop: threading.Event | None = None) -> FakeClock:
+        return FakeClock(now)
+
+    def fake_run(week: datetime | None = None, force: bool = False, dry_run: bool = False) -> None:
+        calls.append((week, force, dry_run))
+
+    def no_handler(signum: int, handler: object) -> None:
+        return None
+
+    monkeypatch.setattr(cli, "SystemClock", fake_clock)
+    monkeypatch.setattr(cli, "run", fake_run)
+    monkeypatch.setattr(Scheduler, "run_forever", Scheduler.cycle)
+    monkeypatch.setattr(cli.signal, "signal", no_handler)
+
+    result = runner.invoke(cli.app, ["serve"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(datetime.combine(monday, datetime.min.time()), False, False)]
