@@ -16,6 +16,9 @@ it (spec §9.2).
 A run that fails, by any exception, is logged and recorded `failed`, and the loop goes on. A
 failed week is not settled, so each later cycle runs it again until Tuesday noon: at most once an
 hour, since every cycle sleeps, and never a second email, since a week that went out is settled.
+
+`run` pings healthchecks however it ends. The outcomes it cannot reach are pinged here: a week
+recorded `skipped_missed`, and a failure that stopped `run` before it opened its row.
 """
 
 import logging
@@ -28,6 +31,7 @@ from sqlalchemy import Engine, select
 
 from cbb_digest import liveness
 from cbb_digest.clock import Clock
+from cbb_digest.heartbeat import Heartbeat, failure_reason, report_run
 from cbb_digest.runs import (
     SENT_STATUSES,
     FinalStatus,
@@ -75,7 +79,8 @@ class Scheduler:
     for `MAX_SLEEP`, if sooner.
 
     `run_week` runs a week given its Monday; `season` names its run id. `dry_run` says whether
-    `run_week` sends to the outbox. Setting `stop` ends the loop at the next sleep.
+    `run_week` sends to the outbox. `heartbeat` is pinged for the outcomes recorded here rather
+    than by `run_week`; without one, nothing is. Setting `stop` ends the loop at the next sleep.
     """
 
     def __init__(
@@ -87,6 +92,7 @@ class Scheduler:
         run_week: RunWeek,
         dry_run: bool = False,
         image_sha: str | None = None,
+        heartbeat: Heartbeat | None = None,
         stop: threading.Event | None = None,
     ) -> None:
         self._clock = clock
@@ -95,6 +101,7 @@ class Scheduler:
         self._run_week = run_week
         self._dry_run = dry_run
         self._image_sha = image_sha
+        self._heartbeat = heartbeat
         self._stop = stop or threading.Event()
 
     def run_forever(self) -> None:
@@ -134,11 +141,13 @@ class Scheduler:
         log.info("running the week", extra={"run_id": run_id})
         try:
             self._run_week(monday)
-        except Exception:
-            # `run` records its own failures once its row is open; this covers what stops it
-            # before then (a bad watchlist or transport config), so the week still shows failed.
+        except Exception as exc:
+            # `run` records and pings its own failures once its row is open; this covers what
+            # stops it before then (a bad watchlist or transport config), so the week still shows
+            # failed and healthchecks still hears.
             log.exception("scheduled run failed", extra={"run_id": run_id})
-            self._close_open(monday, run_id, "failed", self._clock.now())
+            if self._close_open(monday, run_id, "failed", self._clock.now()):
+                self._report(run_id, "failed", reason=failure_reason(exc))
 
     def _record_missed(self, monday: date, run_id: str, cutoff: datetime, now: datetime) -> None:
         with self._engine.connect() as connection:
@@ -154,6 +163,11 @@ class Scheduler:
             return
         if self._close_open(monday, run_id, "skipped_missed", now):
             log.warning("week missed: not sent by Tuesday noon", extra={"run_id": run_id})
+            self._report(run_id, "skipped_missed")
+
+    def _report(self, run_id: str, status: FinalStatus, *, reason: str | None = None) -> None:
+        if self._heartbeat is not None:
+            report_run(self._heartbeat, run_id=run_id, status=status, reason=reason)
 
     def _close_open(self, monday: date, run_id: str, status: FinalStatus, now: datetime) -> bool:
         """Record `run_id` as `status` if it has no outcome yet (no row, or still `running`);

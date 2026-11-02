@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 import pytest
 import respx
+from respx.models import Call
 from sqlalchemy import Engine, select
 from typer.testing import CliRunner
 
@@ -502,3 +503,99 @@ def test_run_with_no_transport_configured_exits_2_before_fetching(
     assert code == 2
     assert "no transport is configured" in output
     assert not sources.calls
+
+
+# --- healthchecks ---
+
+HC_URL = "https://hc-ping.com/abc-123"
+
+
+@pytest.fixture
+def pings(sources: respx.MockRouter, monkeypatch: pytest.MonkeyPatch) -> dict[str, respx.Route]:
+    """`HEALTHCHECKS_URL` set, and its success and `/fail` routes on the shared router."""
+    monkeypatch.setenv("HEALTHCHECKS_URL", HC_URL)
+    return {
+        "ok": sources.route(method__in=["GET", "POST"], url=HC_URL).respond(200, text="OK"),
+        "fail": sources.post(f"{HC_URL}/fail").respond(200, text="OK"),
+    }
+
+
+def _pinged(route: respx.Route) -> list[str]:
+    # `CallList` is an untyped `list`; its elements are `Call`s.
+    calls: list[Call] = list(route.calls)
+    return [call.request.content.decode() for call in calls]
+
+
+@pytest.mark.usefixtures("mail")
+def test_a_sent_run_pings_success_with_its_status(
+    sources: respx.MockRouter, pings: dict[str, respx.Route]
+) -> None:
+    _resend_ok(sources)
+
+    code, output = _invoke("run", "--week", WEEK)
+
+    assert code == 0, output
+    assert _pinged(pings["ok"]) == [f"sent {RUN_ID} -"]
+    assert not pings["fail"].called
+
+
+@pytest.mark.usefixtures("mail")
+def test_a_degraded_run_pings_success_naming_the_failed_sources(
+    sources: respx.MockRouter, pings: dict[str, respx.Route]
+) -> None:
+    _resend_ok(sources)
+    sources.get(f"{cbbd.BASE_URL}{cbbd.RATINGS_PATH}").respond(503)
+
+    code, output = _invoke("run", "--week", WEEK, "--no-retry")
+
+    assert code == 0, output
+    assert _pinged(pings["ok"]) == [f"sent_degraded {RUN_ID} cbbd"]
+
+
+@pytest.mark.usefixtures("env")
+def test_an_out_of_season_run_pings_success(
+    monkeypatch: pytest.MonkeyPatch, pings: dict[str, respx.Route]
+) -> None:
+    # `DRY_RUN=true` is how `serve` runs a week before going live: still a Monday to ping.
+    monkeypatch.setenv("DRY_RUN", "true")
+
+    code, output = _invoke("run", "--week", "2026-07-06")
+
+    assert code == 0, output
+    assert _pinged(pings["ok"]) == ["skipped_offseason 2026-W28 -"]
+
+
+@pytest.mark.usefixtures("mail")
+def test_a_failed_run_pings_fail_with_the_reason(
+    sources: respx.MockRouter, pings: dict[str, respx.Route]
+) -> None:
+    sources.post(API_URL).respond(500)
+    FakeSMTP.fail_with = ConnectionRefusedError("refused")
+
+    code, output = _invoke("run", "--week", WEEK)
+
+    assert code == 1, output
+    assert not pings["ok"].called
+    [body] = _pinged(pings["fail"])
+    assert body.startswith(f"failed {RUN_ID} -: ")
+    assert "AllTransportsFailed: all transports failed" in body
+
+
+@pytest.mark.usefixtures("env")
+def test_run_dry_run_never_pings(pings: dict[str, respx.Route]) -> None:
+    code, output = _invoke("run", "--week", WEEK, "--dry-run")
+
+    assert code == 0, output
+    assert not pings["ok"].called
+    assert not pings["fail"].called
+
+
+@pytest.mark.usefixtures("mail")
+def test_an_unset_healthchecks_url_makes_no_request(sources: respx.MockRouter) -> None:
+    _resend_ok(sources)
+    healthchecks = sources.route(host="hc-ping.com")
+
+    code, output = _invoke("run", "--week", WEEK)
+
+    assert code == 0, output
+    assert not healthchecks.called
