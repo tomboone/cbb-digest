@@ -12,8 +12,8 @@ Images are published by `.github/workflows/image.yml` on every push to `main`:
 | `latest` | what kumadrome runs |
 | `sha-<7>` | pinning or rolling back to one commit |
 
-Commands below run on kumadrome, in a shell opened with `ssh kumadrome`. The one that needs `sudo`
-prompts for your password there.
+Commands below run on kumadrome, in a shell opened with `ssh kumadrome`. Those that need `sudo`
+prompt for your password there.
 
 ## 1. Make sure kumadrome can pull the image
 
@@ -213,6 +213,157 @@ the subject `CBB digest — week of <Mon D>`, for example `CBB digest — week o
 
 File each rendering problem as a bug ticket against the templates. Turning on the weekly send is the
 go-live step, not this one.
+
+## 7. Nightly backup to B2
+
+The database holds the history no source can give back: the weekly ratings snapshots behind movers,
+and the resolution rows behind alert-on-change. `backup/cbb-digest-backup.sh` copies it nightly at
+05:30 Eastern (+ up to 15 min) from a systemd timer on the host, as `tom`. It:
+
+- refuses to run unless `/mnt/music` is mounted;
+- copies `data/cbb-digest.sqlite3` with the host's `sqlite3 .backup` (SQLite's online backup, safe
+  while the container writes; a `cp` of a live WAL database is not) into a dated
+  `cbb-digest-<YYYYmmdd-HHMMSS>.sqlite3` in `/mnt/music/cbb-digest/backups`, checks it with
+  `PRAGMA integrity_check`, and deletes copies older than `KEEP_DAYS` (14);
+- `rclone sync`s that directory to `cbb-digest-backups/` in the B2 bucket the Navidrome backup uses.
+  The `b2` remote has `hard_delete = false`, so a copy aged out stays recoverable per the bucket's
+  lifecycle;
+- pings a push monitor on the Kuma on kumadrome: `up` after a good run, `down` with the reason on
+  failure.
+
+It reads the database read-only, because `data/` belongs to the container's UID 999. That works
+while the container is running, which holds the database open; with `cbb-digest` stopped, the
+night's run fails with `sqlite3 .backup failed (is the cbb-digest container running?)`.
+
+| File | Purpose |
+|---|---|
+| `backup/cbb-digest-backup.sh` | The job. POSIX `sh`. Reads `~/.config/cbb-digest-backup.env`. |
+| `backup/cbb-digest-backup.env.example` | Its settings: the paths, `KEEP_DAYS`, the B2 destination, and `PING_URL`. |
+| `backup/cbb-digest-backup.service`, `.timer` | Oneshot service as `tom`, with `RequiresMountsFor=/mnt/music`. `Persistent` catches up after downtime. |
+
+### Install
+
+rclone and the `b2` remote are already on kumadrome, from the Navidrome backup (`rclone listremotes`
+lists `b2:`).
+
+**1. `sqlite3` on the host.** `sqlite3 --version` prints a version: 3.22 or later, the first that
+reads a WAL database it cannot write to (kumadrome has 3.46). If it says `command not found`, install
+it:
+
+```sh
+sudo apt-get install -y sqlite3
+```
+
+**2. The copy directory**, on the drive. `/mnt/music` belongs to `tom`, so no `sudo`:
+
+```sh
+mountpoint /mnt/music && mkdir -p /mnt/music/cbb-digest/backups
+```
+
+The first command prints `/mnt/music is a mountpoint`; if it doesn't, the drive is not mounted, and
+the directory is not created.
+
+**3. A push monitor** on the Kuma on kumadrome (`http://127.0.0.1:3001`): *Add New Monitor*, type
+*Push*, name `kumadrome/cbb-digest-backup`, heartbeat interval 25 h (90000 s), retries 0. Copy its
+push URL.
+
+**4. Settings.** Copy the template, set the B2 destination from the Navidrome backup's bucket (its
+`DB_REMOTE`), and
+set the push URL from step 3. Paste the URL at the `Kuma push URL:` prompt and press Enter. It is
+written in double quotes: the file is sourced, and an unquoted `&` from Kuma's default
+`?status=up&msg=OK&ping=` query would leave `PING_URL` unset and skip the ping silently.
+
+```sh
+cp backup/cbb-digest-backup.env.example ~/.config/cbb-digest-backup.env
+chmod 600 ~/.config/cbb-digest-backup.env
+bucket=$(sed -n 's#^DB_REMOTE=b2:\([^/]*\)/.*#\1#p' ~/.config/navidrome-backup.env)
+[ -n "$bucket" ] && sed -i "s#^REMOTE=.*#REMOTE=b2:$bucket/cbb-digest-backups#" ~/.config/cbb-digest-backup.env \
+  || echo 'no bucket: DB_REMOTE=b2:<bucket>/… not found in ~/.config/navidrome-backup.env'
+printf 'Kuma push URL: ' && read -r PING_URL
+sed -i '/^PING_URL=/d' ~/.config/cbb-digest-backup.env && printf 'PING_URL="%s"\n' "$PING_URL" >>~/.config/cbb-digest-backup.env
+unset bucket PING_URL
+```
+
+Check every value took:
+
+```sh
+grep -E '^[A-Z_]+=' ~/.config/cbb-digest-backup.env
+```
+
+It prints `MOUNT_POINT=/mnt/music`, `BACKUP_DIR=/mnt/music/cbb-digest/backups`, `KEEP_DAYS=14`,
+`REMOTE=b2:<the bucket>/cbb-digest-backups` with a real bucket name after `b2:`, and
+`PING_URL="http://127.0.0.1:3001/api/push/…"`. No line still contains `<bucket>` or `<token>`.
+
+**5. Timer**, and a first run in the foreground. Run it with `cbb-digest` up (`docker compose ps`
+shows it `healthy`):
+
+```sh
+sudo cp backup/cbb-digest-backup.service backup/cbb-digest-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now cbb-digest-backup.timer
+sudo systemctl start cbb-digest-backup.service
+systemctl status cbb-digest-backup.service --no-pager; journalctl -u cbb-digest-backup --since -1h
+systemctl list-timers cbb-digest-backup.timer
+ls -l /mnt/music/cbb-digest/backups
+. ~/.config/cbb-digest-backup.env && rclone ls "$REMOTE"
+```
+
+`status` shows the service `inactive (dead)` with `status=0/SUCCESS`, `list-timers` shows the next
+run after 05:30, the copy is in both listings, and `kumadrome/cbb-digest-backup` shows an `up`
+heartbeat.
+
+The units run the script from this clone, so a `git pull` updates the job. After a change to a unit
+file, copy it again and `sudo systemctl daemon-reload`.
+
+### Restore
+
+Restoring is by hand.
+
+**1. Pick the copy.** This takes the newest on B2, which holds every copy the drive does, and fetches
+it to the drive if the drive's copy is gone:
+
+```sh
+. ~/.config/cbb-digest-backup.env
+ts=$(rclone lsf "$REMOTE" --include 'cbb-digest-*.sqlite3' | sed 's/^cbb-digest-//; s/\.sqlite3$//' | sort | tail -1)
+copy="$BACKUP_DIR/cbb-digest-$ts.sqlite3"
+[ -r "$copy" ] || rclone copy "$REMOTE/cbb-digest-$ts.sqlite3" "$BACKUP_DIR/"
+ls -l "$copy"
+```
+
+`ls` lists one file, named for the newest copy. To restore an older one, `rclone lsf "$REMOTE"` lists
+them all; set `ts` to the one you want, for example `ts=20261102-053712`, then run the `copy=` line
+and the two after it again. If the drive itself is gone, run `BACKUP_DIR=/tmp` before the `copy=` line.
+
+**2. Drill** on a scratch copy, which leaves the live database alone. It prints `ok`, the last three
+runs as of the copy, and the Alembic revision:
+
+```sh
+cp "$copy" /tmp/restore-drill.sqlite3
+sqlite3 /tmp/restore-drill.sqlite3 'PRAGMA integrity_check' \
+  'select run_id, status, sent_at from runs order by started_at desc limit 3' \
+  'select version_num from alembic_version'
+rm -f /tmp/restore-drill.sqlite3*
+```
+
+**3. For real**, stop the container, put the copy in place owned by UID 999, delete the old database's
+`-wal` and `-shm` (left beside the copy, SQLite would replay them into it), and start it again.
+`serve` migrates on start, so a copy from an older revision is brought up to head:
+
+```sh
+docker compose stop cbb-digest
+sudo install -o 999 -g 999 -m 644 "$copy" data/cbb-digest.sqlite3
+sudo rm -f data/cbb-digest.sqlite3-wal data/cbb-digest.sqlite3-shm
+docker compose start cbb-digest
+docker compose ps
+```
+
+`cbb-digest` shows `healthy` within a minute.
+
+A copy taken before this week's send has no `sent_at` for it, so `serve` sends the week again if it
+starts between Monday 07:00 and Tuesday noon: the drill's `runs` shows whether the copy has this
+week's run as `sent`. If it does not, and you don't want the week sent twice, leave out the
+`docker compose start` line and run it after Tuesday 12:00 instead; `serve` then records the week
+`skipped_missed` and sends nothing.
 
 ## Day-to-day
 
