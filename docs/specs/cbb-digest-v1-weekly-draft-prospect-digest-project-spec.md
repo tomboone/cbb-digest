@@ -281,7 +281,7 @@ Every step can be re-run alone. Steps after `fetch` read only from the cache and
 2. If it is currently Monday 07:00 through Tuesday 12:00 ET and the current run id has no `sent_at` and is not `skipped_offseason`, run now. A missed Monday catches up until Tuesday noon. After that the week is skipped and logged, and healthchecks has already alarmed.
 3. Sleep until the next Monday 07:00 ET.
 
-The run id is `season + ISO week`. Re-running the same week overwrites that week's ratings snapshot and resolution rows. It sends again **only** with `--force`. `TZ=America/New_York` is set in the image, and all scheduling uses `zoneinfo`, so DST needs no attention.
+The run id is `season + ISO week`. Re-running the same week overwrites that week's ratings snapshot and resolution rows. It sends again **only** with `--force`. A dry run's outbox send emails nobody, so it does not count as sent: it is never refused, never blocks the real send of the same week, and never replaces the record of a send that went out by email. It is recorded (`transport=outbox`) only on a week not yet emailed. "Has `sent_at`" means a send by email, in `send`, `run` and `serve` alike. `TZ=America/New_York` is set in the image, and all scheduling uses `zoneinfo`, so DST needs no attention.
 
 ### 9.3 Failure handling
 

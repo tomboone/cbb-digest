@@ -82,8 +82,9 @@ grep '^DRY_RUN=' .env              # DRY_RUN=true
 Resend credentials and the healthchecks.io URL are set when the digest goes live. Every variable and
 its default is documented in `.env.example`.
 
-With `DRY_RUN=true`, once the pipeline lands, a run renders the digest to `data/out/` instead of
-emailing it. For now `serve` only keeps its heartbeat and logs the next send time.
+With `DRY_RUN=true`, a run renders the digest to `data/out/` and writes it to
+`data/outbox/<run id>.html` instead of emailing it. A dry run never blocks the real send of the
+same week. For now `serve` only keeps its heartbeat and logs the next send time.
 
 ## 5. Start it
 

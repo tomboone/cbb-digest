@@ -22,8 +22,8 @@ and [`docs/adr/`](docs/adr/) for the design decisions. The watchlist is
 | `cbb-digest resolve` | Resolves the watchlist against Torvik's player file |
 | `cbb-digest compute` | Builds the digest model |
 | `cbb-digest render [--dry-run]` | Renders the digest to HTML and text |
-| `cbb-digest send [--force]` | Sends the digest |
-| `cbb-digest run [--week YYYY-MM-DD] [--force] [--dry-run]` | All of the above for one week |
+| `cbb-digest send [--week YYYY-MM-DD] [--force]` | Sends the digest through Resend, falling back to SMTP; refuses a week already emailed unless `--force` |
+| `cbb-digest run [--week YYYY-MM-DD] [--force] [--dry-run]` | All of the above for one week, recorded in `runs`; `--dry-run` writes to `DATA_DIR/outbox/` instead of emailing |
 | `cbb-digest serve` | Runs the weekly scheduler loop (the container entrypoint) |
 | `cbb-digest reset --season N [--send]` | Builds the portal-reset digest for a new season |
 | `cbb-digest health` | Exits 0 if the scheduler has been active in the last 8 days |

@@ -8,6 +8,11 @@ them. So a restarted week that already went out still refuses to send again with
 
 `ensure_run` is the third writer: `load` and `resolve`, run on their own, need a row for their
 rows to reference, and it inserts a placeholder without touching one that exists.
+
+`record_send` stamps `sent_at` and `transport` the moment a send delivers, and `already_sent` is
+the guard every real send checks first. A dry run's outbox "send" emails nobody: it is recorded
+on a week not yet emailed, never replaces the record of one that was, and never blocks the real
+send (spec §9.2).
 """
 
 from collections.abc import Mapping, Sequence
@@ -24,6 +29,8 @@ type RunKind = Literal["digest", "reset"]
 type FinalStatus = Literal["sent", "sent_degraded", "skipped_offseason", "skipped_missed", "failed"]
 
 SENT_STATUSES: frozenset[FinalStatus] = frozenset({"sent", "sent_degraded"})
+# `OutboxTransport.name`: the dry-run transport, which writes files and emails nobody.
+DRY_RUN_TRANSPORT = "outbox"
 
 
 def start_run(
@@ -74,8 +81,9 @@ def finish_run(
     """Close `run_id` with `status`, stamping `finished_at` and the duration since it started.
 
     `transport` names the transport that sent the email, and is given exactly when `status` is
-    `sent` or `sent_degraded`; `sent_at` is then `now`. A run that sent nothing keeps whatever
-    `sent_at` and `transport` an earlier attempt stored.
+    `sent` or `sent_degraded`; `sent_at` is then `now`, unless it is a dry run over a week
+    already emailed. A run that sent nothing keeps whatever `sent_at` and `transport` an earlier
+    attempt stored.
     """
     if (status in SENT_STATUSES) != (transport is not None):
         raise ValueError(f"status {status!r} with transport {transport!r}")
@@ -92,9 +100,45 @@ def finish_run(
         "failed_sources": list(failed_sources),
         "alerts": list(alerts),
     }
-    if transport is not None:
+    if transport is not None and _records_over(connection, run_id, transport):
         values |= {"sent_at": now, "transport": transport}
     connection.execute(update(runs).where(runs.c.run_id == run_id).values(values))
+
+
+def already_sent(connection: Connection, run_id: str) -> bool:
+    """Whether `run_id` has gone out by email: it has a `sent_at` from a transport other than
+    the dry-run outbox. A real send checks this first and refuses without `--force`."""
+    row = connection.execute(
+        select(runs.c.sent_at, runs.c.transport).where(runs.c.run_id == run_id)
+    ).first()
+    return row is not None and row.sent_at is not None and row.transport != DRY_RUN_TRANSPORT
+
+
+def record_send(connection: Connection, *, run_id: str, transport: str, sent_at: datetime) -> None:
+    """Stamp `run_id` as sent by `transport` at `sent_at`, leaving its status alone.
+
+    Called as soon as a send delivers, so a crash before the run finishes still leaves the guard
+    set. A dry run on a week already emailed records nothing. Raises `LookupError` when `run_id`
+    has no row.
+    """
+    if not has_run(connection, run_id):
+        raise LookupError(f"no run {run_id!r} to record a send for")
+    if _records_over(connection, run_id, transport):
+        connection.execute(
+            update(runs).where(runs.c.run_id == run_id).values(sent_at=sent_at, transport=transport)
+        )
+
+
+def has_run(connection: Connection, run_id: str) -> bool:
+    return (
+        connection.execute(select(runs.c.run_id).where(runs.c.run_id == run_id)).first() is not None
+    )
+
+
+def _records_over(connection: Connection, run_id: str, transport: str) -> bool:
+    """Whether a send by `transport` replaces the send `run_id` holds: always, except a dry run
+    over a week already emailed, whose record must keep guarding it."""
+    return transport != DRY_RUN_TRANSPORT or not already_sent(connection, run_id)
 
 
 def ensure_run(

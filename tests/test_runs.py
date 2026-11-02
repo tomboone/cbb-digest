@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import Engine, func, select
 
 from cbb_digest import db
-from cbb_digest.runs import ensure_run, finish_run, start_run
+from cbb_digest.runs import already_sent, ensure_run, finish_run, record_send, start_run
 from cbb_digest.schema import runs
 from cbb_digest.weeks import windows_for
 
@@ -194,3 +194,63 @@ def test_ensure_run_leaves_a_started_run_alone(engine: Engine) -> None:
 
     assert count == 1
     assert _rows(engine)[0]["image_sha"] == "abc1234"
+
+
+def _already_sent(engine: Engine) -> bool:
+    with engine.connect() as connection:
+        return already_sent(connection, RUN)
+
+
+def test_a_run_never_started_or_not_yet_sent_is_not_already_sent(engine: Engine) -> None:
+    assert not _already_sent(engine)
+    _start(engine)
+    assert not _already_sent(engine)
+
+
+def test_record_send_stamps_the_send_and_leaves_the_status(engine: Engine) -> None:
+    _start(engine)
+
+    with engine.begin() as connection:
+        record_send(connection, run_id=RUN, transport="resend", sent_at=FINISHED)
+
+    [row] = _rows(engine)
+    assert (row["status"], row["sent_at"], row["transport"]) == ("running", FINISHED, "resend")
+    assert _already_sent(engine)
+
+
+def test_a_dry_run_send_to_the_outbox_does_not_count_as_sent(engine: Engine) -> None:
+    _start(engine)
+    _finish(engine, status="sent", transport="outbox")
+
+    assert not _already_sent(engine)
+
+
+def test_recording_a_send_for_an_unknown_run_raises(engine: Engine) -> None:
+    with engine.begin() as connection, pytest.raises(LookupError, match=RUN):
+        record_send(connection, run_id=RUN, transport="resend", sent_at=FINISHED)
+
+
+def test_a_dry_run_never_replaces_the_record_of_a_real_send(engine: Engine) -> None:
+    _start(engine)
+    _finish(engine, status="sent", transport="resend")
+    later = FINISHED + timedelta(hours=1)
+
+    with engine.begin() as connection:
+        record_send(connection, run_id=RUN, transport="outbox", sent_at=later)
+    _finish(engine, now=later, status="sent", transport="outbox")
+
+    [row] = _rows(engine)
+    assert (row["sent_at"], row["transport"]) == (FINISHED, "resend")
+    assert _already_sent(engine)
+
+
+def test_a_real_send_replaces_a_dry_runs_record(engine: Engine) -> None:
+    _start(engine)
+    _finish(engine, status="sent", transport="outbox")
+    later = FINISHED + timedelta(hours=1)
+
+    with engine.begin() as connection:
+        record_send(connection, run_id=RUN, transport="smtp", sent_at=later)
+
+    [row] = _rows(engine)
+    assert (row["sent_at"], row["transport"]) == (later, "smtp")

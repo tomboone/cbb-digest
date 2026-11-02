@@ -38,19 +38,11 @@ def test_help_lists_commands() -> None:
         assert re.search(rf"\b{command}\b", output), command
 
 
-@pytest.mark.parametrize(
-    "args",
-    [
-        ["send", "--force"],
-        ["run", "--week", "2026-11-09", "--force", "--dry-run"],
-        ["reset", "--season", "2028", "--send"],
-    ],
-)
-def test_stub_exits_1_not_implemented(args: list[str]) -> None:
-    result = runner.invoke(app, args)
+def test_reset_is_a_stub_that_exits_1() -> None:
+    result = runner.invoke(app, ["reset", "--season", "2028", "--send"])
 
     assert result.exit_code == 1
-    assert f"{args[0]}: not implemented" in result.output
+    assert "reset: not implemented" in result.output
 
 
 def test_reset_requires_season() -> None:
