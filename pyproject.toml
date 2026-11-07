@@ -6,8 +6,15 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.20.1",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "mjml-python>=1.4.2",
     "pydantic>=2.14.2",
     "pydantic-settings>=2.16.2",
+    "pyyaml>=6.0.3",
+    "rapidfuzz>=3.14.6",
+    "sqlalchemy>=2.1.6",
     "typer>=0.27.3",
 ]
 
@@ -43,5 +50,8 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
+    "respx>=0.23.1",
     "ruff>=0.17.3",
+    "syrupy>=6.1.1",
+    "types-pyyaml>=6.0.12.20261030",
 ]

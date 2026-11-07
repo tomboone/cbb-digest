@@ -1,0 +1,200 @@
+# serializer version: 1
+# name: test_the_fixture_week_digest
+  dict({
+    'alerts': list([
+      dict({
+        'detail': 'was Duke, now Kentucky',
+        'kind': 'team_changed',
+        'name': 'Otega Oweh',
+      }),
+      dict({
+        'detail': "not in Torvik's file",
+        'kind': 'unresolved',
+        'name': 'Nobody Real',
+      }),
+    ]),
+    'banner': list([
+    ]),
+    'featured': dict({
+      'more_count': 0,
+      'rows': list([
+        dict({
+          'away': dict({
+            'display_name': 'Lipscomb',
+            'rank': 203,
+            'slug': 'lipscomb',
+          }),
+          'espn_id': '401920702',
+          'home': dict({
+            'display_name': 'Iowa',
+            'rank': 21,
+            'slug': 'iowa',
+          }),
+          'networks': 'BTN',
+          'players': list([
+            dict({
+              'name': 'Bennett Stirtz',
+              'team_slug': 'iowa',
+              'tier': 1,
+              'torvik_pid': 128048,
+            }),
+          ]),
+          'start': '2026-11-03T20:00:00-05:00',
+          'venue': 'Carver-Hawkeye Arena',
+        }),
+        dict({
+          'away': dict({
+            'display_name': 'Wofford',
+            'rank': 242,
+            'slug': 'wofford',
+          }),
+          'espn_id': '401906848',
+          'home': dict({
+            'display_name': 'Tennessee',
+            'rank': 14,
+            'slug': 'tennessee',
+          }),
+          'networks': 'SEC Network',
+          'players': list([
+            dict({
+              'name': 'Nate Ament',
+              'team_slug': 'tennessee',
+              'tier': 1,
+              'torvik_pid': 134712,
+            }),
+          ]),
+          'start': '2026-11-03T18:00:00-05:00',
+          'venue': 'Food City Center',
+        }),
+        dict({
+          'away': dict({
+            'display_name': 'Manhattan',
+            'rank': 330,
+            'slug': 'manhattan',
+          }),
+          'espn_id': '401921801',
+          'home': dict({
+            'display_name': 'Kentucky',
+            'rank': 29,
+            'slug': 'kentucky',
+          }),
+          'networks': 'SECN+',
+          'players': list([
+            dict({
+              'name': 'Otega Oweh',
+              'team_slug': 'kentucky',
+              'tier': 2,
+              'torvik_pid': 76600,
+            }),
+          ]),
+          'start': '2026-11-03T19:00:00-05:00',
+          'venue': 'Rupp Arena',
+        }),
+      ]),
+    }),
+    'footer': dict({
+      'data_as_of': '2026-11-01',
+      'image_sha': '0123456789abcdef0123456789abcdef01234567',
+      'run_id': '2026-W45',
+      'run_ts_et': '2026-11-02T07:00:00-05:00',
+      'watchlist_url': 'https://github.com/tomboone/cbb-digest/blob/0123456789abcdef0123456789abcdef01234567/watchlist.yaml',
+    }),
+    'freshmen': dict({
+      'rows': list([
+        dict({
+          'assists_per_game': 5.333333333333333,
+          'games': 33,
+          'minutes_per_game': 30.521212121212123,
+          'name': 'Acaden Lewis',
+          'points_per_game': 12.151515151515152,
+          'rebounds_per_game': 3.0303030303030303,
+          'team_name': 'Villanova',
+          'team_rank': 39,
+          'team_slug': 'villanova',
+          'torvik_pid': 135227,
+          'true_shooting': 0.5150005137162231,
+        }),
+        dict({
+          'assists_per_game': 1.105263157894737,
+          'games': 38,
+          'minutes_per_game': 23.51842105263158,
+          'name': 'Dame Sarr',
+          'points_per_game': 6.421052631578948,
+          'rebounds_per_game': 3.8157894736842106,
+          'team_name': 'Duke',
+          'team_rank': 2,
+          'team_slug': 'duke',
+          'torvik_pid': 133946,
+          'true_shooting': 0.518531111866712,
+        }),
+        dict({
+          'assists_per_game': 2.973684210526316,
+          'games': 38,
+          'minutes_per_game': 22.794736842105266,
+          'name': 'Cayden Boozer',
+          'points_per_game': 7.657894736842105,
+          'rebounds_per_game': 2.263157894736842,
+          'team_name': 'Duke',
+          'team_rank': 2,
+          'team_slug': 'duke',
+          'torvik_pid': 134969,
+          'true_shooting': 0.5987654320987654,
+        }),
+        dict({
+          'assists_per_game': 1.7777777777777777,
+          'games': 36,
+          'minutes_per_game': 22.62222222222222,
+          'name': 'Malachi Moreno',
+          'points_per_game': 7.777777777777778,
+          'rebounds_per_game': 6.333333333333333,
+          'team_name': 'Kentucky',
+          'team_rank': 29,
+          'team_slug': 'kentucky',
+          'torvik_pid': 135386,
+          'true_shooting': 0.6350934494647069,
+        }),
+        dict({
+          'assists_per_game': 1.0263157894736843,
+          'games': 38,
+          'minutes_per_game': 19.83157894736842,
+          'name': 'Nikolas Khamenia',
+          'points_per_game': 5.7368421052631575,
+          'rebounds_per_game': 3.263157894736842,
+          'team_name': 'Duke',
+          'team_rank': 2,
+          'team_slug': 'duke',
+          'torvik_pid': 134970,
+          'true_shooting': 0.5719983207388749,
+        }),
+      ]),
+    }),
+    'kind': 'digest',
+    'movers': dict({
+      'baseline': True,
+      'more_count': 0,
+      'rows': list([
+      ]),
+    }),
+    'run_id': '2026-W45',
+    'season': 2026,
+    'subject': 'CBB digest — week of Nov 2',
+    'torvik_teams': dict({
+      'duke': 'Duke',
+      'iowa': 'Iowa',
+      'kentucky': 'Kentucky',
+      'lipscomb': 'Lipscomb',
+      'manhattan': 'Manhattan',
+      'tennessee': 'Tennessee',
+      'villanova': 'Villanova',
+      'wofford': 'Wofford',
+    }),
+    'watchlist': dict({
+      'alerts': list([
+      ]),
+      'more_count': 0,
+      'rows': list([
+      ]),
+    }),
+    'week_of': '2026-11-02',
+  })
+# ---

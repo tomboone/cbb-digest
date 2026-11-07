@@ -41,9 +41,9 @@ WORKDIR /app
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/src ./src
 
-# The watchlist is baked in and edited by PR (spec §7.1). The crosswalk is added by a later ticket;
-# the bracket glob lets this COPY succeed while it does not exist yet.
-COPY watchlist.yaml teams_crosswalk.yam[l] ./
+# The watchlist and the team crosswalk are baked in and edited by PR (spec §7.1, §7.5).
+# `teams.CROSSWALK_PATH` resolves to /app/teams_crosswalk.yaml through the editable install of /app/src.
+COPY watchlist.yaml teams_crosswalk.yaml ./
 
 # The commit the image was built from, recorded on every run. CI passes it; local builds leave it empty.
 ARG IMAGE_SHA=""

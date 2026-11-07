@@ -1,0 +1,103 @@
+# Hand-mapped Torvik names for the canonical teams (spec §7.5), keyed by slug.
+#
+# A canonical team's `torvik_name` is CBBD's `school` unless it is listed here. Every entry is a
+# team whose Torvik name differs from that `school`; the comment gives the `school`. Entries are
+# listed one by one, never derived by a rule such as `State` → `St.`.
+#
+# Built from the Torvik 2026 season file and the CBBD 2027 teams (tests/fixtures/);
+# tests/test_crosswalk.py fails when a Torvik team maps to no slug. Add or fix an entry here when a
+# run raises `unmapped_team` for a Torvik name.
+
+alabama-state: {torvik_name: "Alabama St."}  # Alabama State
+alcorn-state: {torvik_name: "Alcorn St."}  # Alcorn State
+american-university: {torvik_name: "American"}  # American University
+app-state: {torvik_name: "Appalachian St."}  # App State
+arizona-state: {torvik_name: "Arizona St."}  # Arizona State
+arkansas-pine-bluff: {torvik_name: "Arkansas Pine Bluff"}  # Arkansas-Pine Bluff
+arkansas-state: {torvik_name: "Arkansas St."}  # Arkansas State
+ball-state: {torvik_name: "Ball St."}  # Ball State
+bethune-cookman: {torvik_name: "Bethune Cookman"}  # Bethune-Cookman
+boise-state: {torvik_name: "Boise St."}  # Boise State
+cal-state-bakersfield: {torvik_name: "Cal St. Bakersfield"}  # Cal State Bakersfield
+cal-state-fullerton: {torvik_name: "Cal St. Fullerton"}  # Cal State Fullerton
+cal-state-northridge: {torvik_name: "Cal St. Northridge"}  # Cal State Northridge
+california-baptist: {torvik_name: "Cal Baptist"}  # California Baptist
+chicago-state: {torvik_name: "Chicago St."}  # Chicago State
+cleveland-state: {torvik_name: "Cleveland St."}  # Cleveland State
+colorado-state: {torvik_name: "Colorado St."}  # Colorado State
+coppin-state: {torvik_name: "Coppin St."}  # Coppin State
+delaware-state: {torvik_name: "Delaware St."}  # Delaware State
+east-tennessee-state: {torvik_name: "East Tennessee St."}  # East Tennessee State
+florida-international: {torvik_name: "FIU"}  # Florida International
+florida-state: {torvik_name: "Florida St."}  # Florida State
+fresno-state: {torvik_name: "Fresno St."}  # Fresno State
+gardner-webb: {torvik_name: "Gardner Webb"}  # Gardner-Webb
+georgia-state: {torvik_name: "Georgia St."}  # Georgia State
+grambling: {torvik_name: "Grambling St."}  # Grambling
+hawaii: {torvik_name: "Hawaii"}  # Hawai'i
+idaho-state: {torvik_name: "Idaho St."}  # Idaho State
+illinois-state: {torvik_name: "Illinois St."}  # Illinois State
+indiana-state: {torvik_name: "Indiana St."}  # Indiana State
+iowa-state: {torvik_name: "Iowa St."}  # Iowa State
+iu-indianapolis: {torvik_name: "IU Indy"}  # IU Indianapolis
+jackson-state: {torvik_name: "Jackson St."}  # Jackson State
+jacksonville-state: {torvik_name: "Jacksonville St."}  # Jacksonville State
+kansas-city: {torvik_name: "UMKC"}  # Kansas City
+kansas-state: {torvik_name: "Kansas St."}  # Kansas State
+kennesaw-state: {torvik_name: "Kennesaw St."}  # Kennesaw State
+kent-state: {torvik_name: "Kent St."}  # Kent State
+long-beach-state: {torvik_name: "Long Beach St."}  # Long Beach State
+long-island-university: {torvik_name: "LIU"}  # Long Island University
+loyola-maryland: {torvik_name: "Loyola MD"}  # Loyola Maryland
+mcneese: {torvik_name: "McNeese St."}  # McNeese
+miami: {torvik_name: "Miami FL"}  # Miami
+miami-oh: {torvik_name: "Miami OH"}  # Miami (OH)
+michigan-state: {torvik_name: "Michigan St."}  # Michigan State
+mississippi-state: {torvik_name: "Mississippi St."}  # Mississippi State
+mississippi-valley-state: {torvik_name: "Mississippi Valley St."}  # Mississippi Valley State
+missouri-state: {torvik_name: "Missouri St."}  # Missouri State
+montana-state: {torvik_name: "Montana St."}  # Montana State
+morehead-state: {torvik_name: "Morehead St."}  # Morehead State
+morgan-state: {torvik_name: "Morgan St."}  # Morgan State
+murray-state: {torvik_name: "Murray St."}  # Murray State
+nc-state: {torvik_name: "N.C. State"}  # NC State
+new-mexico-state: {torvik_name: "New Mexico St."}  # New Mexico State
+nicholls: {torvik_name: "Nicholls St."}  # Nicholls
+norfolk-state: {torvik_name: "Norfolk St."}  # Norfolk State
+north-dakota-state: {torvik_name: "North Dakota St."}  # North Dakota State
+northwestern-state: {torvik_name: "Northwestern St."}  # Northwestern State
+ohio-state: {torvik_name: "Ohio St."}  # Ohio State
+oklahoma-state: {torvik_name: "Oklahoma St."}  # Oklahoma State
+ole-miss: {torvik_name: "Mississippi"}  # Ole Miss
+omaha: {torvik_name: "Nebraska Omaha"}  # Omaha
+oregon-state: {torvik_name: "Oregon St."}  # Oregon State
+penn-state: {torvik_name: "Penn St."}  # Penn State
+pennsylvania: {torvik_name: "Penn"}  # Pennsylvania
+portland-state: {torvik_name: "Portland St."}  # Portland State
+queens-university: {torvik_name: "Queens"}  # Queens University
+sacramento-state: {torvik_name: "Sacramento St."}  # Sacramento State
+sam-houston: {torvik_name: "Sam Houston St."}  # Sam Houston
+san-diego-state: {torvik_name: "San Diego St."}  # San Diego State
+san-jose-state: {torvik_name: "San Jose St."}  # San José State
+se-louisiana: {torvik_name: "Southeastern Louisiana"}  # SE Louisiana
+seattle-u: {torvik_name: "Seattle"}  # Seattle U
+south-carolina-state: {torvik_name: "South Carolina St."}  # South Carolina State
+south-carolina-upstate: {torvik_name: "USC Upstate"}  # South Carolina Upstate
+south-dakota-state: {torvik_name: "South Dakota St."}  # South Dakota State
+southeast-missouri-state: {torvik_name: "Southeast Missouri St."}  # Southeast Missouri State
+st-thomas-minnesota: {torvik_name: "St. Thomas"}  # St. Thomas-Minnesota
+tarleton-state: {torvik_name: "Tarleton St."}  # Tarleton State
+tennessee-state: {torvik_name: "Tennessee St."}  # Tennessee State
+texas-a-m-corpus-christi: {torvik_name: "Texas A&M Corpus Chris"}  # Texas A&M-Corpus Christi
+texas-state: {torvik_name: "Texas St."}  # Texas State
+ualbany: {torvik_name: "Albany"}  # UAlbany
+uconn: {torvik_name: "Connecticut"}  # UConn
+uic: {torvik_name: "Illinois Chicago"}  # UIC
+ul-monroe: {torvik_name: "Louisiana Monroe"}  # UL Monroe
+ut-martin: {torvik_name: "Tennessee Martin"}  # UT Martin
+utah-state: {torvik_name: "Utah St."}  # Utah State
+washington-state: {torvik_name: "Washington St."}  # Washington State
+weber-state: {torvik_name: "Weber St."}  # Weber State
+wichita-state: {torvik_name: "Wichita St."}  # Wichita State
+wright-state: {torvik_name: "Wright St."}  # Wright State
+youngstown-state: {torvik_name: "Youngstown St."}  # Youngstown State

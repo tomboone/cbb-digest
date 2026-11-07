@@ -31,7 +31,7 @@ Matching a watchlist player to one player in Torvik's player season file for the
 _Avoid_: lookup, matching
 
 **Alert**:
-A watchlist problem or change the email reports: unresolved, ambiguous, team changed, fuzzy match, inactive, unmapped team. An alert is raised only when its outcome differs from last week's.
+A watchlist problem or change the email reports: unresolved, ambiguous, team changed, fuzzy match, inactive, unmapped team. An alert is raised only on the run where its outcome or its details first appear or change, so a standing problem is reported once.
 _Avoid_: warning, error
 
 **Inactive**:
