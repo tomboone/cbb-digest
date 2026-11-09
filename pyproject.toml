@@ -43,7 +43,8 @@ venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+# Coverage is reported, not gated.
+addopts = "-ra --cov=cbb_digest --cov-report=term-missing"
 
 [dependency-groups]
 dev = [

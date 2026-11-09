@@ -1,38 +1,33 @@
 version: 2
 updates:
-  - package-ecosystem: "uv"
-    directory: "/"
+  - package-ecosystem: uv
+    directory: /
+    target-branch: updates/dependencies
     schedule:
-      interval: "weekly"
-      day: "saturday"
+      interval: weekly
+      day: saturday
       time: "09:00"
-      timezone: "America/New_York"
-    target-branch: "updates/dependencies"
+      timezone: America/New_York
     commit-message:
-      prefix: "build"
-      prefix-development: "build"
-      include: "scope"
+      prefix: build
+      prefix-development: build
     groups:
       minor-and-patch:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: [minor, patch]
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: updates/dependencies
     schedule:
-      interval: "weekly"
-      day: "saturday"
+      interval: weekly
+      day: saturday
       time: "09:00"
-      timezone: "America/New_York"
-    target-branch: "updates/dependencies"
+      timezone: America/New_York
     commit-message:
-      prefix: "ci"
-      include: "scope"
+      prefix: ci
+    # The shared workflows float on @v1; bumping them is the workflows repo's job.
+    ignore:
+      - dependency-name: neuroticsasquat-ch/workflows
     groups:
       minor-and-patch:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: [minor, patch]

@@ -3,38 +3,45 @@ name: ci
 on:
   pull_request:
   push:
-    branches: ["main"]
+    branches: [main]
+
+# A newer push to a PR cancels its older run; runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  ci:
+  # uv sync, ruff check, ruff format --check, pyright, the Alembic single-head and drift checks, pytest.
+  # Scope and options live in pyproject.toml; .github/ci/setup.sh makes the directory alembic.ini's SQLite
+  # URL points into.
+  python:
+    uses: neuroticsasquat-ch/workflows/.github/workflows/python.yml@v1
+
+  # Builds the image without pushing, checks it doesn't run as root, runs .github/ci/smoke.sh.
+  image:
+    uses: neuroticsasquat-ch/workflows/.github/workflows/image-check.yml@v1
+
+  ci: # the one required check; the name is the contract
+    if: always()
+    needs: [python, image] # every other job, extras included
     runs-on: ubuntu-latest
-    env:
-      # Keep `uv run` from re-locking; every step uses uv.lock as committed.
-      UV_FROZEN: "1"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
+      - uses: neuroticsasquat-ch/workflows/actions/gate@v1
         with:
-          enable-cache: true
+          needs: ${{ toJSON(needs) }}
 
-      - name: Install dependencies
-        run: uv sync --frozen
-
-      - name: Ruff check
-        run: uv run ruff check .
-
-      - name: Ruff format check
-        run: uv run ruff format --check .
-
-      - name: Pyright
-        run: uv run pyright
-
-      - name: Pytest
-        # Coverage is reported, not gated.
-        run: uv run pytest -q --cov=cbb_digest --cov-report=term-missing
+  # main → latest and sha-<7>, only after ci passed on that commit. Watchtower deploys latest.
+  publish:
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.ci.result == 'success' }}
+    needs: ci
+    concurrency: { group: "publish-${{ github.ref }}", cancel-in-progress: false }
+    permissions: { contents: read, packages: write }
+    uses: neuroticsasquat-ch/workflows/.github/workflows/image-publish.yml@v1
+    with:
+      image: ghcr.io/tomboone/cbb-digest
+      # The full commit SHA, recorded on every run (spec §3, Watchlist).
+      build-args: |
+        IMAGE_SHA=${{ github.sha }}

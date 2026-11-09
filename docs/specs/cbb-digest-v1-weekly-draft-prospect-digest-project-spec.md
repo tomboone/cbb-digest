@@ -37,7 +37,7 @@ Tom follows the NBA, not college basketball. cbb-digest emails him one Monday-mo
 | Watchlist | `watchlist.yaml` at the repo root, baked into the image and edited by PR. Each run records the image's git SHA. |
 | Repo | `tomboone/cbb-digest`, public, MIT. GHCR package public, so Watchtower can pull anonymously. |
 | Toolchain | Python 3.13, uv, ruff (lint + format), pyright (strict), pytest, respx, syrupy, httpx, pydantic v2 + pydantic-settings, typer, rapidfuzz, SQLAlchemy 2 core, Alembic, PyYAML, mjml-python, Jinja2. Same `pyproject.toml` tool config as nba-today. |
-| CI and branches | GitHub Actions lints and tests every PR. On push to `main` it builds and pushes `:latest` and `:sha-<7>`. PRs target `main` and merge as merge commits. Standard rulesets, Dependabot to `updates/dependencies`, and the weekly merge workflow (copy nba-today's). |
+| CI and branches | GitHub Actions lints, typechecks and tests every PR, checks the Alembic migrations, and builds the image. On push to `main`, once `ci` passes, it pushes `:sha-<7>`, plus `:latest` while the commit is still the tip of `main`. PRs target `main` and merge as merge commits. Standard rulesets, Dependabot to `updates/dependencies`, and automated dependency promotion, all through the shared `neuroticsasquat-ch/workflows@v1` (amended 2026-11-09, NEU-2244). |
 
 ## 4. Glossary pointers
 
@@ -326,7 +326,7 @@ The season comes from `watchlist.yaml`, not an environment variable.
 ## 10. Operations
 
 - **Image:** a multi-stage uv Dockerfile running as non-root UID/GID 999. `TZ=America/New_York`. `watchlist.yaml` and `teams_crosswalk.yaml` are copied in. `IMAGE_SHA` is a build arg. `HEALTHCHECK` is `cbb-digest health`.
-- **Workflows:** `.github/workflows/ci.yml` (ruff, format, pyright, pytest) and `image.yml` (push to `main` → GHCR `:latest`, `:sha-<7>`). Copy both from nba-today.
+- **Workflows:** `.github/workflows/ci.yml` calls the shared `python`, `image-check` and `image-publish` workflows (push to `main`, after `ci` passes → GHCR `:sha-<7>`, plus `:latest` while the commit is the tip; build-arg `IMAGE_SHA`), and `dependencies.yml` calls `dependency-branch` (amended 2026-11-09, NEU-2244: replaces `image.yml` and the weekly merge workflow).
 - **Deploy:** `deploy/docker-compose.yml` with `cbb-digest` (`restart: unless-stopped`, `./data:/data`, `env_file: .env`) and a `nickfedor/watchtower:1.23.2` scoped to `cbb-digest`. `deploy/README.md` is a runbook in nba-today's shape (sparse clone, `chown 999:999 data`, healthchecks setup, `.env`, first run with `DRY_RUN=true`, going live). Commands on kumadrome needing `sudo` are written for Tom to run.
 - **Backup:** `deploy/backup/cbb-digest-backup.{sh,service,timer,env.example}`, cloned from closinglineup.
   - The script uses `sqlite3 /…/data/cbb-digest.sqlite3 ".backup '<tmp>'"`, then `PRAGMA integrity_check` on the copy, then an atomic rename.

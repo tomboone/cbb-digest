@@ -41,7 +41,8 @@ uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run 
 
 ## Container image
 
-Every push to `main` publishes `ghcr.io/tomboone/cbb-digest:latest` and `:sha-<7>`. The image runs
+Every push to `main` publishes `ghcr.io/tomboone/cbb-digest:sha-<7>` once its `ci` check passes,
+plus `:latest` while that commit is still the tip of `main`. The image runs
 `cbb-digest serve` as UID/GID 999 with `TZ=America/New_York`, keeps its state in `/data`, and has
 `watchlist.yaml` baked in.
 
