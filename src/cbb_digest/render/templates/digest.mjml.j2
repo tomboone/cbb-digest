@@ -81,9 +81,11 @@
         {% for game in day.games %}
         <mj-text font-size="12px" font-weight="700" color="{{ muted }}" padding="10px 16px 0">{{ game.start | tip }} · {{ game.networks }}</mj-text>
         <mj-text padding="2px 16px 0"><strong>{{ ranked(game.away) }} at {{ ranked(game.home) }}</strong></mj-text>
-        <mj-text font-size="12px" padding="2px 16px 0">
-          {% for p in game.players %}<span style="color:{{ muted }};">{{ p.tier | tier_label }}</span> {{ link(p.name, player_url(p.name, p.team_slug)) }}{% if not loop.last %} · {% endif %}{% endfor %}
+        {% for line in game.tiers %}
+        <mj-text font-size="12px" padding="{{ '4px' if loop.first else '1px' }} 16px 0">
+          <span style="color:{{ muted }};font-weight:700;">{{ line.tier | tier_label }}:</span> {% for e in line.entries %}{{ link(e.player.name, player_url(e.player.name, e.player.team_slug)) }} <span style="color:{{ muted }};">(</span>{{ link(e.team.display_name or "TBD", team_url(e.team.slug)) }}<span style="color:{{ muted }};">)</span>{% if not loop.last %} · {% endif %}{% endfor %}
         </mj-text>
+        {% endfor %}
         {% endfor %}
         {% endfor %}
         {% if featured.more_count %}

@@ -44,6 +44,24 @@ class FeaturedPlayer(_Model):
     team_slug: str
 
 
+def _tier(player: FeaturedPlayer) -> Tier:
+    return player.tier
+
+
+class FeaturedEntry(_Model):
+    """A watchlist player in a featured game, with the side of the game they play for."""
+
+    player: FeaturedPlayer
+    team: FeaturedTeam
+
+
+class FeaturedTierLine(_Model):
+    """One tier's watchlist players in a featured game, in name order."""
+
+    tier: Tier
+    entries: list[FeaturedEntry]
+
+
 class FeaturedGame(_Model):
     """One featured game (spec §8.3): `start` is aware Eastern, and `networks` is ESPN's
     broadcast names joined with `/`, or `—` when the game has none. `players` are sorted by tier,
@@ -56,6 +74,24 @@ class FeaturedGame(_Model):
     home: FeaturedTeam
     away: FeaturedTeam
     players: list[FeaturedPlayer]
+
+    @property
+    def tiers(self) -> list[FeaturedTierLine]:
+        """The players as the email shows them: one line per tier present, each player paired
+        with the team they play for, so the name beside them matches the matchup line."""
+        return [
+            FeaturedTierLine(
+                tier=tier,
+                entries=[
+                    FeaturedEntry(
+                        player=player,
+                        team=self.home if player.team_slug == self.home.slug else self.away,
+                    )
+                    for player in players
+                ],
+            )
+            for tier, players in groupby(self.players, key=_tier)
+        ]
 
 
 class FeaturedDay(_Model):
