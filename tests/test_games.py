@@ -249,6 +249,58 @@ def test_seven_candidates_give_five_and_two_more(engine: Engine) -> None:
     assert section.more_count == 2
 
 
+def _days(section: FeaturedGamesSection) -> list[tuple[date, list[str]]]:
+    return [(day.day, [game.espn_id for game in day.games]) for day in section.days]
+
+
+def test_days_show_the_selected_games_by_tip_time_grouped_by_date(engine: Engine) -> None:
+    with engine.begin() as connection:
+        world = _World(connection)
+        world.prospect("t01", 1)
+        world.prospect("t02", 2)
+        world.prospect("t03", 3)
+        wednesday = world.game("t01", "t10", start=TIP + timedelta(days=1))
+        tuesday_late = world.game("t02", "t11", start=TIP + timedelta(hours=2))
+        tuesday_early = world.game("t03", "t12")
+
+        section = world.featured()
+
+    # Selection keeps the §8.3 order; only the display is by time.
+    assert _order(section) == [wednesday, tuesday_late, tuesday_early]
+    assert _days(section) == [
+        (date(2026, 11, 10), [tuesday_early, tuesday_late]),
+        (date(2026, 11, 11), [wednesday]),
+    ]
+
+
+def test_a_late_tip_groups_under_its_eastern_date(engine: Engine) -> None:
+    with engine.begin() as connection:
+        world = _World(connection)
+        world.prospect("t01", 1)
+        # Tuesday 11:30 PM ET is already Wednesday in UTC.
+        late = world.game("t01", "t10", start=datetime(2026, 11, 11, 4, 30, tzinfo=UTC))
+
+        section = world.featured()
+
+    assert _days(section) == [(date(2026, 11, 10), [late])]
+
+
+def test_days_hold_only_the_selected_games(engine: Engine) -> None:
+    with engine.begin() as connection:
+        world = _World(connection)
+        for n in range(7):
+            world.prospect(SLUGS[n], 3 if n < 2 else 1)
+            # The two tier-3 games tip first, so time order alone would pick them.
+            world.game(SLUGS[n], SLUGS[n + 10], start=TIP + timedelta(hours=n))
+
+        section = world.featured()
+
+    shown = [espn_id for _, day in _days(section) for espn_id in day]
+    assert sorted(shown) == sorted(_order(section))
+    assert len(shown) == 5
+    assert section.more_count == 2
+
+
 def test_a_row_carries_start_et_networks_venue_and_players(engine: Engine) -> None:
     with engine.begin() as connection:
         world = _World(connection)
