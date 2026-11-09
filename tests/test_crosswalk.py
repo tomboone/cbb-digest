@@ -29,7 +29,7 @@ from cbb_digest.teams import (
 FIXTURES = Path(__file__).parent / "fixtures"
 CBBD_TEAMS = parse_teams((FIXTURES / "cbbd" / "teams-y2027-2026-11-01.json").read_bytes())
 TORVIK_SEASON = parse_player_season(
-    (FIXTURES / "torvik" / "getadvstats-y2026-2026-11-01.csv").read_bytes()
+    (FIXTURES / "torvik" / "getadvstats-y2026-2026-11-09.csv").read_bytes()
 )
 TORVIK_GAMES: list[list[Any]] = json.loads(
     (FIXTURES / "torvik" / "all_advgames-y2026-2026-11-01.json").read_bytes()

@@ -74,7 +74,7 @@ def sources() -> Iterator[respx.MockRouter]:
     with respx.mock(assert_all_called=False) as router:
         router.get(f"{torvik.BASE_URL}{torvik.PLAYER_SEASON_PATH}").respond(
             200,
-            content=(FIXTURES / "torvik/getadvstats-y2026-2026-11-01.csv").read_bytes(),
+            content=(FIXTURES / "torvik/getadvstats-y2026-2026-11-09.csv").read_bytes(),
             headers={"Content-Type": "text/csv"},
         )
         router.get(f"{torvik.BASE_URL}{torvik.player_games_path(2026)}").mock(

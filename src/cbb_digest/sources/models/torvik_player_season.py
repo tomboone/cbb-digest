@@ -1,6 +1,7 @@
 """Torvik's player season file, `getadvstats.php?year=<season>&csv=1` (spec §6).
 
-A headerless CSV of 67 fields per row, in hoopR's `R/torvik_player_stats.R` order; the full map is
+A headerless CSV of 78 fields per row. Fields 0-66 are in hoopR's `R/torvik_player_stats.R` order;
+Torvik appended fields 67-77, which are unnamed, on or before 2026-11-09 (NEU-2262). The full map is
 in `tests/fixtures/README.md`. Only the fields the digest reads are kept.
 
 Units differ by field, as Torvik serves them: the shooting makes and attempts are **season
@@ -17,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from cbb_digest.sources.models.torvik_base import pick
 
-FIELD_COUNT = 67
+FIELD_COUNT = 78
 
 COLUMNS = {
     "name": 0,

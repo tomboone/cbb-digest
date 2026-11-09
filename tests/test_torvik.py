@@ -26,8 +26,8 @@ from cbb_digest.sources.torvik import (
 from tests.fakes import FakeClock
 
 FIXTURES = Path(__file__).parent / "fixtures" / "torvik"
-SEASON_2026 = (FIXTURES / "getadvstats-y2026-2026-11-01.csv").read_bytes()
-SEASON_2027 = (FIXTURES / "getadvstats-y2027-2026-11-01.csv").read_bytes()
+SEASON_2026 = (FIXTURES / "getadvstats-y2026-2026-11-09.csv").read_bytes()
+SEASON_2027 = (FIXTURES / "getadvstats-y2027-2026-11-09.csv").read_bytes()
 GAMES_2026 = (FIXTURES / "all_advgames-y2026-2026-11-01.json").read_bytes()
 CHALLENGE_HTML = (FIXTURES / "playerstat-challenge-2026-11-01.html").read_bytes()
 
@@ -97,24 +97,26 @@ def test_player_season_row_maps_each_column(client: httpx.Client, cache: Respons
     rows = fetch_player_season(client, cache, 2027)
 
     assert isinstance(rows, list)
-    assert rows[0] == TorvikPlayerSeason(
-        pid=75474,
+    # Every mapped field in this row holds a distinct non-zero value, so a swapped index shows.
+    [harvey] = [row for row in rows if row.pid == 73110]
+    assert harvey == TorvikPlayerSeason(
+        pid=73110,
         season=2027,
-        name="Logan Duncomb",
-        team="Notre Dame",
+        name="Keegan Harvey",
+        team="Bryant",
         class_year="Sr",
-        games=1,
-        min_per_game=20.9,
-        pts_per_game=9,
-        reb_per_game=3,
-        ast_per_game=4,
-        fg2m=3,
-        fg2a=5,
-        fg3m=1,
-        fg3a=2,
-        fta=2,
+        games=3,
+        min_per_game=34.4,
+        pts_per_game=14.6667,
+        reb_per_game=7.6667,
+        ast_per_game=1.3333,
+        fg2m=9,
+        fg2a=15,
+        fg3m=7,
+        fg3a=18,
+        fta=8,
     )
-    assert (rows[0].fgm, rows[0].fga) == (4, 7)
+    assert (harvey.fgm, harvey.fga) == (16, 33)
 
 
 @respx.mock
@@ -127,7 +129,28 @@ def test_player_season_with_a_column_removed_is_a_shape_failure(
 
     assert isinstance(result, SourceFailure)
     assert result.source == "torvik"
-    assert "shape: row 1 has 66 fields, expected 67" in result.reason
+    assert "shape: row 1 has 77 fields, expected 78" in result.reason
+
+
+def _keep_csv_fields(body: bytes, count: int) -> bytes:
+    out = io.StringIO()
+    writer = csv.writer(out)
+    for row in csv.reader(io.StringIO(body.decode())):
+        writer.writerow(row[:count])
+    return out.getvalue().encode()
+
+
+@respx.mock
+def test_player_season_in_the_67_field_layout_is_a_shape_failure(
+    client: httpx.Client, cache: ResponseCache
+) -> None:
+    # Torvik served 67 fields until it appended fields 67-77 (NEU-2262).
+    respx.get(SEASON_URL).mock(return_value=_csv(_keep_csv_fields(SEASON_2027, 67)))
+
+    result = fetch_player_season(client, cache, 2027)
+
+    assert isinstance(result, SourceFailure)
+    assert "shape: row 1 has 67 fields, expected 78" in result.reason
 
 
 @respx.mock
