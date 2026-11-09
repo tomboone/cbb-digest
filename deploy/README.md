@@ -5,7 +5,8 @@ from GHCR. kumadrome is the home Mac mini (Ubuntu, Docker with the Compose plugi
 mlb-today and closinglineup run on the same host. The container runs `cbb-digest serve`: a loop that
 sleeps until Monday 07:00 America/New_York and keeps a heartbeat in SQLite for its health check.
 
-Images are published by `.github/workflows/image.yml` on every push to `main`:
+Each push to `main` publishes from the `publish` job in `.github/workflows/ci.yml`, once that commit's `ci` check has
+passed. It pushes `sha-<7>`, plus `latest` while the commit is still the tip of `main`:
 
 | Tag | Use |
 |---|---|

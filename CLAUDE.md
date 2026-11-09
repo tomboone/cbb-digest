@@ -22,4 +22,4 @@ uv, ruff, pyright, pytest. Python 3.13. `uv run ruff check . && uv run ruff form
 
 ## Branch flow
 
-Work branches are cut from `main`, and PRs target `main` as merge commits. Every push to `main` publishes `ghcr.io/tomboone/cbb-digest:latest`, which Watchtower deploys to kumadrome.
+Work branches are cut from `main`, and PRs target `main` as merge commits. Every push to `main` whose `ci` check passes publishes `ghcr.io/tomboone/cbb-digest` (`latest` while that commit is still the tip of `main`), which Watchtower deploys to kumadrome. CI, image publishing and dependency automation call the shared `neuroticsasquat-ch/workflows@v1` (ops spec `docs/specs/ops-shared-ci-workflows-project-spec.md`).
