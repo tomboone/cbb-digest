@@ -14,6 +14,9 @@ season: 2027          # season end year
 # (CBS shows only its top 30; "—" = not on that board):
 #   Tankathon big board (updated ~2026-10-20), Bleacher Report top 100 (Wasserman, 2026-08-25),
 #   CBS Sports prospect rankings (undated).
+# 2026-11-09: dropped Brandon McCoy Jr. (torn ACL, out for the season) and re-applied the rule:
+# Malachi Moreno moves up to tier 2, and Stefan Vaaks comes in at 35 (mean 39.5, tied with Sayon
+# Keita; picked for his first week). All three boards were unchanged since the seed.
 players:
   - name: Tyran Stokes
     team: "Kansas"
@@ -75,11 +78,6 @@ players:
     tier: 2
     class: 2027
     note: "15 / 16 / 11"
-  - name: Brandon McCoy Jr.
-    team: "Michigan"
-    tier: 2
-    class: 2027
-    note: "9 / 20 / —"
   - name: Cameron Williams
     team: "Duke"
     tier: 2
@@ -142,7 +140,7 @@ players:
     note: "26 / 31 / —"
   - name: Malachi Moreno
     team: "Kentucky"
-    tier: 3
+    tier: 2
     class: 2027
     note: "32 / 33 / 22"
   - name: David Mirkovic
@@ -190,3 +188,8 @@ players:
     tier: 3
     class: 2027
     note: "31 / 47 / —"
+  - name: Stefan Vaaks
+    team: "Illinois"
+    tier: 3
+    class: 2027
+    note: "36 / 43 / —"
