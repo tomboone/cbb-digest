@@ -1,6 +1,7 @@
 # Source fixtures
 
-Real responses saved by the source probe of 2026-11-01 (NEU-2093). The filename is
+Real responses saved by the source probe of 2026-11-01 (NEU-2093), plus the player season files
+re-fetched on 2026-11-09 after Torvik changed their layout (NEU-2262). The filename is
 `<endpoint>[-y<season>]-<fetch date>.<ext>`. `-y<season>` appears whenever the request names a season. Requests that name a date window instead (ESPN scoreboard, CBBD games) carry no season token, and this table gives their window. Findings and decisions are in spec §6. This file
 records what each fixture is, how it was fetched, and how it was trimmed.
 
@@ -11,8 +12,8 @@ All requests used curl with a desktop Chrome User-Agent and `--compressed`. CBBD
 
 | # | Time (UTC) | Status | Request | Fixture |
 |---|---|---|---|---|
-| 1 | 20:37:33 | 200 `text/csv` | Torvik `getadvstats.php?year=2027&csv=1` | `torvik/getadvstats-y2027-2026-11-01.csv` |
-| 2 | 20:37:59 | 200 `text/csv` | Torvik `getadvstats.php?year=2026&csv=1` | `torvik/getadvstats-y2026-2026-11-01.csv` (trimmed) |
+| 1 | 20:37:33 | 200 `text/csv` | Torvik `getadvstats.php?year=2027&csv=1` | none (67-field layout; replaced, see [Re-fetch of 2026-11-09](#re-fetch-of-2026-11-09)) |
+| 2 | 20:37:59 | 200 `text/csv` | Torvik `getadvstats.php?year=2026&csv=1` | none (67-field layout; replaced, see [Re-fetch of 2026-11-09](#re-fetch-of-2026-11-09)) |
 | 3 | 20:38:10 | 200, empty body | Torvik `getgamestats.php?year=2027&csv=1` | none |
 | 4 | 20:38:10 | 302 → `/` | Torvik `2027_all_advgames.json.gz` | none |
 | 5 | 20:38:29 | 200 `text/csv` | Torvik `getgamestats.php?year=2026&csv=1` | none (team-game file, not used) |
@@ -29,6 +30,19 @@ All requests used curl with a desktop Chrome User-Agent and `--compressed`. CBBD
 
 ESPN fixture 8 is the schedule for Tuesday 2026-11-03 ET (29 games), not for the fetch date.
 
+## Re-fetch of 2026-11-09
+
+On 2026-11-09 the weekly run failed to parse the player season file: every row had 78 fields,
+not 67 (NEU-2262). Torvik had appended 11 fields to the end of each row, for every season. Fields
+0–66 kept their positions: all 440 players in both 2026 fixtures parse to the same values under
+the old and new layouts. The two player season fixtures were re-fetched with the app's
+User-Agent (`sources/http.py`) and `--compressed`, and the 67-field fixtures were removed.
+
+| Time (UTC) | Status | Request | Fixture |
+|---|---|---|---|
+| 19:15:23 | 200 `text/csv` | Torvik `getadvstats.php?year=2027&csv=1` | `torvik/getadvstats-y2027-2026-11-09.csv` (trimmed) |
+| 19:15:23 | 200 `text/csv` | Torvik `getadvstats.php?year=2026&csv=1` | `torvik/getadvstats-y2026-2026-11-09.csv` (trimmed) |
+
 ## Trimming
 
 The **sample teams** are Iowa, Duke, Notre Dame, Villanova, Tennessee and Kentucky. Their names
@@ -37,6 +51,8 @@ are the same in Torvik, CBBD and ESPN.
 - `torvik/getadvstats-y2026-…csv`: every row of the sample teams plus the first row of every
   other team, so all 365 Torvik team names are present (440 of 4,978 rows). Rows are byte-for-byte
   as served.
+- `torvik/getadvstats-y2027-…csv`: the same rule, so all 358 Torvik teams with a 2027 row are
+  present (433 of 4,265 rows). Rows are byte-for-byte as served.
 - `torvik/all_advgames-y2026-…json`: every row whose team (index 47) is a sample team (2,074 of
   113,882 rows), re-serialised compactly. The full file is 43.8 MB decoded.
 - `cbbd/teams-roster-y2027-…json`: the six sample teams plus the first three entries with no players
@@ -46,9 +62,12 @@ All other fixtures are the response body as served, after gzip decoding.
 
 ## Column maps
 
-### Torvik `getadvstats.php` (player season file): headerless CSV, 67 fields
+### Torvik `getadvstats.php` (player season file): headerless CSV, 78 fields
 
-Matches hoopR's `R/torvik_player_stats.R`, checked against Bennett Stirtz's 2026 row. `games`
+Fields 0–66 match hoopR's `R/torvik_player_stats.R`, checked against Bennett Stirtz's 2026 row.
+Fields 67–77 were appended by 2026-11-09 and are unnamed: hoopR does not map them, and the
+digest does not read them. For Stirtz they hold `81.8, 30.6, 9.8, 22.6, 45.7, 9, 30, 6, 42, 4.6,
+160`. `games`
 counts games played. `ftm`/`fta`/`two_pm`/`two_pa`/`three_pm`/`three_pa` are **season totals**.
 `minutes`, `oreb`, `dreb`, `treb`, `ast`, `stl`, `blk` and `pts` are **per-game averages**.
 `year` is the season. `class` is `Fr`/`So`/`Jr`/`Sr`. Field 66, which hoopR names
@@ -69,6 +88,7 @@ counts games played. `ftm`/`fta`/`two_pm`/`two_pa`/`three_pm`/`three_pa` are **s
 55 ogbpm        56 dgbpm        57 oreb         58 dreb         59 treb
 60 ast          61 stl          62 blk          63 pts          64 role
 65 threat       66 recruit_date
+67–77 unnamed (appended by 2026-11-09)
 ```
 
 ### Torvik `{year}_all_advgames.json.gz` (player game logs): JSON list of 53-element lists
