@@ -9,7 +9,7 @@ from sqlalchemy import Connection, Engine, insert
 
 from cbb_digest import db
 from cbb_digest.compute.games import featured_games
-from cbb_digest.compute.models import FeaturedGamesSection, FeaturedTeam, Tier
+from cbb_digest.compute.models import FeaturedGame, FeaturedGamesSection, FeaturedTeam, Tier
 from cbb_digest.resolve import resolve
 from cbb_digest.runs import start_run
 from cbb_digest.schema import games, players, team_ratings_snapshot, teams
@@ -327,6 +327,30 @@ def test_a_row_carries_start_et_networks_venue_and_players(engine: Engine) -> No
     assert no_broadcast.espn_id == bare
     assert no_broadcast.networks == "—"
     assert no_broadcast.venue is None
+
+
+def _tiers(game: FeaturedGame) -> list[tuple[int, list[tuple[str, str | None]]]]:
+    return [
+        (line.tier, [(entry.player.name, entry.team.display_name) for entry in line.entries])
+        for line in game.tiers
+    ]
+
+
+def test_tiers_give_one_line_per_tier_present_with_each_players_team(engine: Engine) -> None:
+    with engine.begin() as connection:
+        world = _World(connection)
+        world.prospect("t01", 3, name="Cal Home")
+        world.prospect("t10", 1, name="Abe Away")
+        world.prospect("t01", 1, name="Bo Home")
+        world.game("t01", "t10")
+
+        [game] = world.featured().rows
+
+    # No tier-2 player, so no tier-2 line; within a tier, players keep name order.
+    assert _tiers(game) == [
+        (1, [("Abe Away", "Team T10"), ("Bo Home", "Team T01")]),
+        (3, [("Cal Home", "Team T01")]),
+    ]
 
 
 def test_only_this_weeks_games_with_a_resolved_player_qualify(engine: Engine) -> None:
