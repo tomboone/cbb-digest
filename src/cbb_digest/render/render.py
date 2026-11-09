@@ -112,9 +112,9 @@ def tip(when: datetime) -> str:
     return f"{local:%I:%M %p}".removeprefix("0") + " ET"
 
 
-def game_day(when: datetime) -> str:
-    """`Tue Nov 3`, in Eastern."""
-    local = when.astimezone(EASTERN)
+def game_day(when: date) -> str:
+    """`Tue Nov 3`: a date as given, a datetime in Eastern."""
+    local = when.astimezone(EASTERN) if isinstance(when, datetime) else when
     return f"{local:%a %b} {local.day}"
 
 

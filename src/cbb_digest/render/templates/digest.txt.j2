@@ -9,14 +9,20 @@ CBB Digest — week of {{ digest.week_of | long_date }}
 
 
 FEATURED GAMES ({{ this_week }}, tip times Eastern)
-{% for game in featured.rows %}
+{% for day in featured.days %}
 
-{{ game.start | game_day }} · {{ game.start | tip }} · {{ game.networks }}
+{{ day.day | game_day }}
+{% for game in day.games %}
+{% if not loop.first %}
+
+{% endif %}
+  {{ game.start | tip }} · {{ game.networks }}
 {% for team in (game.away, game.home) %}
-  {{ "at " if loop.last else "" }}{{ ((team.rank | rank) ~ " " ~ (team.display_name or "TBD")) | trim }}
+    {{ "at " if loop.last else "" }}{{ ((team.rank | rank) ~ " " ~ (team.display_name or "TBD")) | trim }}
 {% endfor %}
-  Watchlist: {% for p in game.players %}{{ p.tier | tier_label }} {{ p.name }}{% if not loop.last %} · {% endif %}{% endfor %}
+    Watchlist: {% for p in game.players %}{{ p.tier | tier_label }} {{ p.name }}{% if not loop.last %} · {% endif %}{% endfor %}
 
+{% endfor %}
 {% else %}
 
 No games involving your watchlist this week.

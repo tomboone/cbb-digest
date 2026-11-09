@@ -55,7 +55,7 @@ Plain responsive HTML (MJML) with a text part. Readable on a phone in under five
 
 | # | Section | Content | Depends on |
 |---|---|---|---|
-| 1 | Featured games | Up to **5** featured games this week (§8.3). Each row shows date, tip time ET, network(s), both teams with ranks, and the watchlist players involved, by tier. If more qualify: `+N more games involving your watchlist`. | ESPN, CBBD, resolution |
+| 1 | Featured games | Up to **5** featured games this week (§8.3), grouped under a heading per Eastern date and in tip-time order within it. Each row shows tip time ET, network(s), both teams with ranks, and the watchlist players involved, by tier. If more qualify: `+N more games involving your watchlist`. | ESPN, CBBD, resolution |
 | 2 | Watchlist last week | One row per resolved watchlist player whose team played last week: team, games, MPG, PTS/REB/AST per game, TS%, 3PA per game, and at most one **notable** (§8.4). Sorted by tier ↑, then minutes ↓. Capped at **40** rows; `+N more` links to the Torvik player page list. Players whose team did not play are left out. | Torvik game logs, resolution |
 | 3 | Freshmen to watch | **5** freshmen not on the watchlist (§8.5): team, rank of team, MPG, PTS/REB/AST, TS%. | Torvik season file, CBBD |
 | 4 | Top-25 movers | Teams in the CBBD top 25 that moved by 3 or more places, entered or left, with the rank change vs the previous snapshot. Capped at **10**; `+N more` links to Torvik's T-Rank page, labelled "full ratings table (Torvik's; ranks differ slightly)". The first run of a season shows `Baseline snapshot taken — movers start next week.` | CBBD snapshots |
@@ -229,7 +229,7 @@ Candidates are ESPN games in this week where at least one team is the current te
 3. The worse (numerically higher) of the two teams' ranks ↑. A game is as good as its weaker team; an unranked or unmapped team counts as rank 999.
 4. Tip time ↑.
 
-Show the top 5, then `+N more`. Networks come from `broadcasts[].names`, joined with `/`. A game with no broadcast shows `—`.
+Show the top 5, then `+N more`. The sort above only picks the 5; the section shows them by tip time, under a heading per Eastern date (NEU-2263), because the reader scans it as a schedule. Networks come from `broadcasts[].names`, joined with `/`. A game with no broadcast shows `—`.
 
 ### 8.4 Notable
 

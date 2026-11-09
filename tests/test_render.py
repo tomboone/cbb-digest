@@ -419,6 +419,7 @@ def test_times_read_in_eastern() -> None:
 
     assert tip(evening) == "7:00 PM ET"
     assert game_day(evening) == "Tue Nov 3"
+    assert game_day(date(2026, 11, 10)) == "Tue Nov 10"
     assert stamp(evening) == "Nov 3, 7:00 PM ET"
 
 

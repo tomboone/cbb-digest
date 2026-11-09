@@ -5,11 +5,13 @@ is the only thing the templates read; `compute.build` assembles it.
 """
 
 from datetime import date, datetime
+from itertools import groupby
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from cbb_digest.resolve import Alert
+from cbb_digest.weeks import EASTERN
 
 type MoverKind = Literal["moved", "entered", "left"]
 type Tier = Literal[1, 2, 3]
@@ -56,11 +58,33 @@ class FeaturedGame(_Model):
     players: list[FeaturedPlayer]
 
 
+class FeaturedDay(_Model):
+    """One Eastern calendar date of featured games, in tip-time order."""
+
+    day: date
+    games: list[FeaturedGame]
+
+
 class FeaturedGamesSection(_Model):
-    """Section 1: at most 5 featured games, and how many more qualified."""
+    """Section 1: at most 5 featured games, and how many more qualified.
+
+    `rows` is the selection, in the §8.3 order that decides which games make the cut. The email
+    shows `days` instead: the same games by tip time, grouped by Eastern date, because a reader
+    scans a schedule by when, not by why it was picked.
+    """
 
     rows: list[FeaturedGame] = []
     more_count: int = 0
+
+    @property
+    def days(self) -> list[FeaturedDay]:
+        by_time = sorted(self.rows, key=lambda game: (game.start, game.espn_id))
+        return [
+            FeaturedDay(day=day, games=list(games))
+            for day, games in groupby(
+                by_time, key=lambda game: game.start.astimezone(EASTERN).date()
+            )
+        ]
 
 
 class Mover(_Model):

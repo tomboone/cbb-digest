@@ -10,7 +10,9 @@ a `resolved` watchlist player, as `resolve` last stored it. Candidates sort by:
 4. tip time ↑, then ESPN id, so equal games keep one order from run to run.
 
 The reader picks a game a week from this list, so the order must be one they can predict; a
-weighted score, or opponent rank ahead of player count, were both rejected for that reason. Ranks
+weighted score, or opponent rank ahead of player count, were both rejected for that reason. The
+order picks the 5 rows; the email shows them by tip time, grouped by day
+(`FeaturedGamesSection.days`, NEU-2263). Ranks
 are this run's ratings snapshot. A player on two watchlist entries counts once, at their best
 tier.
 """
